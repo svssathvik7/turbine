@@ -23,6 +23,8 @@ pub struct ChainConfig {
     pub health: HealthConfig,
     #[serde(default)]
     pub rotation: RotationStrategy,
+    #[serde(default)]
+    pub cache: Option<CacheConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -81,6 +83,24 @@ pub enum RotationStrategy {
     #[default]
     RoundRobin,
     Weighted,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CacheConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub preset: Option<String>,
+    #[serde(default)]
+    pub max_capacity: Option<u64>,
+    #[serde(default)]
+    pub methods: Vec<CacheMethodConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CacheMethodConfig {
+    pub name: String,
+    pub ttl_seconds: u64,
 }
 
 /// Default health check methods per chain family.

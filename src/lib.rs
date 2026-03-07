@@ -1,3 +1,4 @@
+pub mod cache;
 pub mod config;
 pub mod forwarder;
 pub mod health;
@@ -8,7 +9,10 @@ pub mod router;
 pub mod server;
 pub mod types;
 
-use config::{ChainConfig, Config, EndpointConfig, HealthConfig, RotationStrategy, ServerConfig};
+use config::{
+    CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointConfig, HealthConfig,
+    RotationStrategy, ServerConfig,
+};
 use server::build_router;
 use std::path::Path;
 
@@ -30,6 +34,10 @@ pub struct ChainBuilder {
     health_check_interval_seconds: u64,
     max_block_lag: u64,
     rotation: RotationStrategy,
+    cache_enabled: bool,
+    cache_preset: Option<String>,
+    cache_max_capacity: Option<u64>,
+    cache_methods: Vec<CacheMethodConfig>,
     parent: TurbineBuilder,
 }
 
@@ -88,6 +96,10 @@ impl TurbineBuilder {
             health_check_interval_seconds: 30,
             max_block_lag: 10,
             rotation: RotationStrategy::RoundRobin,
+            cache_enabled: false,
+            cache_preset: None,
+            cache_max_capacity: None,
+            cache_methods: Vec::new(),
             parent: self,
         }
     }
@@ -163,8 +175,46 @@ impl ChainBuilder {
         self
     }
 
+    /// Enable or disable caching for this chain.
+    pub fn cache(mut self, enabled: bool) -> Self {
+        self.cache_enabled = enabled;
+        self
+    }
+
+    /// Set the cache preset ("evm", "solana", "none").
+    pub fn cache_preset(mut self, preset: &str) -> Self {
+        self.cache_preset = Some(preset.to_string());
+        self
+    }
+
+    /// Set the max number of cache entries.
+    pub fn cache_max_capacity(mut self, capacity: u64) -> Self {
+        self.cache_max_capacity = Some(capacity);
+        self
+    }
+
+    /// Add or override a cached method with a specific TTL in seconds.
+    pub fn cache_method(mut self, method: &str, ttl_seconds: u64) -> Self {
+        self.cache_methods.push(CacheMethodConfig {
+            name: method.to_string(),
+            ttl_seconds,
+        });
+        self
+    }
+
     /// Finish configuring this chain and return to the builder.
     pub fn done(self) -> TurbineBuilder {
+        let cache = if self.cache_enabled {
+            Some(CacheConfig {
+                enabled: true,
+                preset: self.cache_preset,
+                max_capacity: self.cache_max_capacity,
+                methods: self.cache_methods,
+            })
+        } else {
+            None
+        };
+
         let chain = ChainConfig {
             name: self.name,
             route: self.route,
@@ -177,6 +227,7 @@ impl ChainBuilder {
                 max_block_lag: self.max_block_lag,
             },
             rotation: self.rotation,
+            cache,
         };
         let mut parent = self.parent;
         parent.chains.push(chain);

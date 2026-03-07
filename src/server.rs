@@ -1,3 +1,4 @@
+use crate::cache::ChainCache;
 use crate::config::Config;
 use crate::forwarder::Forwarder;
 use crate::health_checker::spawn_health_checker;
@@ -28,10 +29,20 @@ pub fn build_router(config: &Config) -> Router {
             chain_config.health.max_block_lag,
         );
 
+        let cache = match &chain_config.cache {
+            Some(cache_config) if cache_config.enabled => {
+                let c = ChainCache::new(cache_config, &chain_config.name);
+                info!(chain = %chain_config.name, "Cache enabled");
+                Some(c)
+            }
+            _ => None,
+        };
+
         let chain_state = ChainState {
             pool,
             metrics: ChainMetrics::new(),
             forwarder: Forwarder::new(),
+            cache,
         };
         info!(
             chain = %chain_config.name,
