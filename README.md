@@ -10,7 +10,47 @@ Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxie
 - **Auto-retry** — retries with a different endpoint on failure
 - **Metrics** — per-chain request/failure stats via `/metrics`
 
-## Quick Start
+## Install
+
+```bash
+cargo add turbine
+```
+
+## As a Library
+
+```rust
+use turbine::Turbine;
+
+#[tokio::main]
+async fn main() {
+    // Builder API — no config file needed
+    let turbine = Turbine::builder()
+        .add_chain("ethereum")
+            .endpoint("https://eth.llamarpc.com")
+            .endpoint("https://rpc.ankr.com/eth")
+            .max_failures(3)
+            .cooldown_secs(30)
+            .done()
+        .add_chain("solana")
+            .endpoint("https://api.mainnet-beta.solana.com")
+            .done()
+        .build()
+        .unwrap();
+
+    // Run standalone
+    turbine.serve("127.0.0.1:8080").await.unwrap();
+}
+```
+
+Or embed in your existing axum app:
+
+```rust
+let turbine = Turbine::from_config("config.toml".as_ref()).unwrap();
+let router = turbine.into_router();
+// Merge with your own routes, add middleware, etc.
+```
+
+## As a CLI
 
 ```bash
 # Build

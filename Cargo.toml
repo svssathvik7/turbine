@@ -3,6 +3,18 @@ name = "turbine"
 version = "0.1.0"
 edition = "2021"
 description = "Multi-chain RPC proxy with intelligent endpoint rotation"
+license = "MIT"
+repository = "https://github.com/svssathvik7/turbine"
+keywords = ["rpc", "proxy", "blockchain", "multi-chain", "load-balancer"]
+categories = ["network-programming", "web-programming"]
+
+[lib]
+name = "turbine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "turbine"
+path = "src/main.rs"
 
 [dependencies]
 axum = "0.8"
