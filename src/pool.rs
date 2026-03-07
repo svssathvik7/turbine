@@ -44,15 +44,21 @@ impl ChainPool {
             }
         }
 
-        // Second pass: find an endpoint past its cooldown
+        // Second pass: pick the least-recently-failed endpoint
+        let mut best: Option<usize> = None;
         for i in 0..len {
             let idx = (start + i) % len;
-            if health[idx].should_retry(self.health_config.cooldown_seconds) {
-                return Some((idx, &self.endpoints[idx]));
+            match best {
+                None => best = Some(idx),
+                Some(prev) => {
+                    if health[idx].failed_earlier_than(&health[prev]) {
+                        best = Some(idx);
+                    }
+                }
             }
         }
 
-        None
+        best.map(|idx| (idx, self.endpoints[idx].as_str()))
     }
 
     /// Select the next healthy endpoint, skipping a specific index (used for retries).
@@ -61,19 +67,35 @@ impl ChainPool {
         let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
         let health = self.health.read().unwrap();
 
+        // First pass: find a healthy endpoint excluding the given index
         for i in 0..len {
             let idx = (start + i) % len;
             if idx == exclude {
                 continue;
             }
-            if health[idx].is_healthy
-                || health[idx].should_retry(self.health_config.cooldown_seconds)
-            {
+            if health[idx].is_healthy {
                 return Some((idx, &self.endpoints[idx]));
             }
         }
 
-        None
+        // Second pass: pick the least-recently-failed endpoint excluding the given index
+        let mut best: Option<usize> = None;
+        for i in 0..len {
+            let idx = (start + i) % len;
+            if idx == exclude {
+                continue;
+            }
+            match best {
+                None => best = Some(idx),
+                Some(prev) => {
+                    if health[idx].failed_earlier_than(&health[prev]) {
+                        best = Some(idx);
+                    }
+                }
+            }
+        }
+
+        best.map(|idx| (idx, self.endpoints[idx].as_str()))
     }
 
     pub fn record_success(&self, idx: usize) {
