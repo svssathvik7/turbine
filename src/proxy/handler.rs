@@ -1,26 +1,12 @@
+use super::{AppState, ChainState};
 use crate::cache::{CacheKey, CachedResponse, ChainCache};
-use crate::forwarder::Forwarder;
-use crate::metrics::ChainMetrics;
-use crate::pool::ChainPool;
 use crate::types::{JsonRpcRequest, JsonRpcResponse};
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Json;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, error, warn};
-
-pub struct AppState {
-    pub chains: HashMap<String, ChainState>,
-}
-
-pub struct ChainState {
-    pub pool: Arc<ChainPool>,
-    pub metrics: ChainMetrics,
-    pub forwarder: Forwarder,
-    pub cache: Option<ChainCache>,
-}
 
 pub async fn proxy_handler(
     State(state): State<Arc<AppState>>,

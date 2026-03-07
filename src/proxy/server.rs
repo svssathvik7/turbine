@@ -1,10 +1,8 @@
+use super::{proxy_handler, AppState, ChainState, Forwarder};
 use crate::cache::ChainCache;
 use crate::config::Config;
-use crate::forwarder::Forwarder;
-use crate::health_checker::spawn_health_checker;
+use crate::health::{spawn_health_checker, ChainPool};
 use crate::metrics::{ChainMetrics, ChainMetricsSnapshot};
-use crate::pool::ChainPool;
-use crate::router::{proxy_handler, AppState, ChainState};
 use axum::extract::State;
 use axum::response::Json;
 use axum::routing::{get, post};

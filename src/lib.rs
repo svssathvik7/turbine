@@ -1,19 +1,15 @@
 pub mod cache;
 pub mod config;
-pub mod forwarder;
 pub mod health;
-pub mod health_checker;
 pub mod metrics;
-pub mod pool;
-pub mod router;
-pub mod server;
+pub mod proxy;
 pub mod types;
 
 use config::{
     CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointConfig, HealthConfig,
     RotationStrategy, ServerConfig,
 };
-use server::build_router;
+use proxy::build_router;
 use std::path::Path;
 
 pub struct Turbine {
