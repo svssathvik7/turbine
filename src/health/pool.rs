@@ -1,5 +1,5 @@
+use super::EndpointHealth;
 use crate::config::{ChainConfig, EndpointConfig, HealthConfig, RotationStrategy};
-use crate::health::EndpointHealth;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 

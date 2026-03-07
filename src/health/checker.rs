@@ -1,5 +1,5 @@
+use super::ChainPool;
 use crate::config::default_health_method;
-use crate::pool::ChainPool;
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
