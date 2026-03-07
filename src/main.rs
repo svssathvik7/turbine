@@ -3,6 +3,7 @@ mod forwarder;
 mod health;
 mod metrics;
 mod pool;
+mod router;
 mod server;
 mod types;
 
