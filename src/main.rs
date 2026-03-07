@@ -1,4 +1,5 @@
 mod config;
+mod forwarder;
 mod health;
 mod pool;
 mod types;
