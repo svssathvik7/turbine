@@ -1,0 +1,28 @@
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[[chains]]
+name = "ethereum"
+route = "/ethereum"
+endpoints = [
+    "https://eth.llamarpc.com",
+    "https://rpc.ankr.com/eth",
+    "https://ethereum-rpc.publicnode.com",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+
+[[chains]]
+name = "solana"
+route = "/solana"
+endpoints = [
+    "https://api.mainnet-beta.solana.com",
+    "https://rpc.ankr.com/solana",
+]
+
+[chains.health]
+max_consecutive_failures = 5
+cooldown_seconds = 60
