@@ -1,17 +1,7 @@
-mod config;
-mod forwarder;
-mod health;
-mod metrics;
-mod pool;
-mod router;
-mod server;
-mod types;
-
 use clap::Parser;
-use config::Config;
 use std::path::PathBuf;
-use tracing::info;
 use tracing_subscriber::EnvFilter;
+use turbine::Turbine;
 
 #[derive(Parser)]
 #[command(name = "turbine", about = "Multi-chain RPC proxy")]
@@ -40,27 +30,16 @@ async fn main() {
         )
         .init();
 
-    let config = Config::load(&cli.config).unwrap_or_else(|e| {
+    let turbine = Turbine::from_config(&cli.config).unwrap_or_else(|e| {
         eprintln!("Failed to load config: {}", e);
         std::process::exit(1);
     });
 
-    let port = cli.port.unwrap_or(config.server.port);
-    let host = &config.server.host;
+    let port = cli.port.unwrap_or(turbine.port());
+    let host = turbine.host().to_string();
     let addr = format!("{}:{}", host, port);
 
-    let router = server::build_router(&config);
-
-    info!("Turbine starting on {}", addr);
-
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
-        .unwrap_or_else(|e| {
-            eprintln!("Failed to bind to {}: {}", addr, e);
-            std::process::exit(1);
-        });
-
-    axum::serve(listener, router).await.unwrap_or_else(|e| {
+    turbine.serve(&addr).await.unwrap_or_else(|e| {
         eprintln!("Server error: {}", e);
         std::process::exit(1);
     });
