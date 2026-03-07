@@ -1,13 +1,14 @@
 pub mod config;
 pub mod forwarder;
 pub mod health;
+pub mod health_checker;
 pub mod metrics;
 pub mod pool;
 pub mod router;
 pub mod server;
 pub mod types;
 
-use config::{ChainConfig, Config, HealthConfig, ServerConfig};
+use config::{ChainConfig, Config, EndpointConfig, HealthConfig, RotationStrategy, ServerConfig};
 use server::build_router;
 use std::path::Path;
 
@@ -22,9 +23,13 @@ pub struct TurbineBuilder {
 pub struct ChainBuilder {
     name: String,
     route: String,
-    endpoints: Vec<String>,
+    endpoints: Vec<EndpointConfig>,
     max_consecutive_failures: u32,
     cooldown_seconds: u64,
+    health_method: Option<String>,
+    health_check_interval_seconds: u64,
+    max_block_lag: u64,
+    rotation: RotationStrategy,
     parent: TurbineBuilder,
 }
 
@@ -79,6 +84,10 @@ impl TurbineBuilder {
             endpoints: Vec::new(),
             max_consecutive_failures: 3,
             cooldown_seconds: 30,
+            health_method: None,
+            health_check_interval_seconds: 30,
+            max_block_lag: 10,
+            rotation: RotationStrategy::RoundRobin,
             parent: self,
         }
     }
@@ -100,15 +109,15 @@ impl TurbineBuilder {
 }
 
 impl ChainBuilder {
-    /// Add an RPC endpoint.
+    /// Add an RPC endpoint with default weight (1).
     pub fn endpoint(mut self, url: &str) -> Self {
-        self.endpoints.push(url.to_string());
+        self.endpoints.push(EndpointConfig { url: url.to_string(), weight: 1 });
         self
     }
 
-    /// Add multiple RPC endpoints.
-    pub fn endpoints(mut self, urls: &[&str]) -> Self {
-        self.endpoints.extend(urls.iter().map(|s| s.to_string()));
+    /// Add an RPC endpoint with a specific weight.
+    pub fn weighted_endpoint(mut self, url: &str, weight: u32) -> Self {
+        self.endpoints.push(EndpointConfig { url: url.to_string(), weight });
         self
     }
 
@@ -130,6 +139,30 @@ impl ChainBuilder {
         self
     }
 
+    /// Set the JSON-RPC method used for health checks (e.g., "eth_blockNumber", "getSlot").
+    pub fn health_method(mut self, method: &str) -> Self {
+        self.health_method = Some(method.to_string());
+        self
+    }
+
+    /// Set the health check interval in seconds (default: 30).
+    pub fn health_check_interval(mut self, secs: u64) -> Self {
+        self.health_check_interval_seconds = secs;
+        self
+    }
+
+    /// Set the max block lag before marking an endpoint as stale (default: 10).
+    pub fn max_block_lag(mut self, lag: u64) -> Self {
+        self.max_block_lag = lag;
+        self
+    }
+
+    /// Set rotation strategy to weighted.
+    pub fn weighted(mut self) -> Self {
+        self.rotation = RotationStrategy::Weighted;
+        self
+    }
+
     /// Finish configuring this chain and return to the builder.
     pub fn done(self) -> TurbineBuilder {
         let chain = ChainConfig {
@@ -139,7 +172,11 @@ impl ChainBuilder {
             health: HealthConfig {
                 max_consecutive_failures: self.max_consecutive_failures,
                 cooldown_seconds: self.cooldown_seconds,
+                health_method: self.health_method,
+                health_check_interval_seconds: self.health_check_interval_seconds,
+                max_block_lag: self.max_block_lag,
             },
+            rotation: self.rotation,
         };
         let mut parent = self.parent;
         parent.chains.push(chain);

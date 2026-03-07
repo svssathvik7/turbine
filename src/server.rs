@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::forwarder::Forwarder;
+use crate::health_checker::spawn_health_checker;
 use crate::metrics::{ChainMetrics, ChainMetricsSnapshot};
 use crate::pool::ChainPool;
 use crate::router::{proxy_handler, AppState, ChainState};
@@ -16,8 +17,19 @@ pub fn build_router(config: &Config) -> Router {
 
     for chain_config in &config.chains {
         let route = chain_config.route.trim_start_matches('/').to_string();
+        let pool = Arc::new(ChainPool::new(chain_config));
+
+        // Spawn background health checker
+        spawn_health_checker(
+            chain_config.name.clone(),
+            Arc::clone(&pool),
+            chain_config.health.health_method.clone(),
+            chain_config.health.health_check_interval_seconds,
+            chain_config.health.max_block_lag,
+        );
+
         let chain_state = ChainState {
-            pool: ChainPool::new(chain_config),
+            pool,
             metrics: ChainMetrics::new(),
             forwarder: Forwarder::new(),
         };
@@ -25,6 +37,7 @@ pub fn build_router(config: &Config) -> Router {
             chain = %chain_config.name,
             endpoints = chain_config.endpoints.len(),
             route = %chain_config.route,
+            rotation = ?chain_config.rotation,
             "Registered chain"
         );
         chains.insert(route, chain_state);

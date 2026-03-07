@@ -2,6 +2,7 @@
 host = "127.0.0.1"
 port = 8080
 
+# Round-robin (default) with simple string endpoints
 [[chains]]
 name = "ethereum"
 route = "/ethereum"
@@ -14,15 +15,23 @@ endpoints = [
 [chains.health]
 max_consecutive_failures = 3
 cooldown_seconds = 30
+# health_method defaults to "eth_blockNumber" for EVM chains
+health_check_interval_seconds = 30
+max_block_lag = 10
 
+# Weighted rotation with explicit weights
 [[chains]]
 name = "solana"
 route = "/solana"
+rotation = "weighted"
 endpoints = [
-    "https://api.mainnet-beta.solana.com",
-    "https://rpc.ankr.com/solana",
+    { url = "https://api.mainnet-beta.solana.com", weight = 3 },
+    { url = "https://rpc.ankr.com/solana", weight = 1 },
 ]
 
 [chains.health]
 max_consecutive_failures = 5
 cooldown_seconds = 60
+health_method = "getSlot"
+health_check_interval_seconds = 15
+max_block_lag = 50
