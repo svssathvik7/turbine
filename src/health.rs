@@ -39,4 +39,14 @@ impl EndpointHealth {
             None => true,
         }
     }
+
+    /// Returns true if this endpoint failed earlier than `other`.
+    /// Used to pick the least-recently-failed endpoint when all are unhealthy.
+    pub fn failed_earlier_than(&self, other: &EndpointHealth) -> bool {
+        match (self.last_failure, other.last_failure) {
+            (Some(a), Some(b)) => a < b,
+            (None, Some(_)) => true,
+            _ => false,
+        }
+    }
 }
