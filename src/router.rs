@@ -15,7 +15,7 @@ pub struct AppState {
 }
 
 pub struct ChainState {
-    pub pool: ChainPool,
+    pub pool: Arc<ChainPool>,
     pub metrics: ChainMetrics,
     pub forwarder: Forwarder,
 }

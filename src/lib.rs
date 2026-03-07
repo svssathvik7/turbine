@@ -1,6 +1,7 @@
 pub mod config;
 pub mod forwarder;
 pub mod health;
+pub mod health_checker;
 pub mod metrics;
 pub mod pool;
 pub mod router;
