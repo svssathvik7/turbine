@@ -66,13 +66,48 @@ async fn proxy_handler(
         }
     };
 
-    chain_state.metrics.record_request();
+    // Parse body to detect batch vs single and count requests
+    let parsed: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(v) => v,
+        Err(_) => {
+            let resp = JsonRpcResponse::proxy_error("Invalid JSON body".to_string());
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(resp).unwrap()),
+            );
+        }
+    };
+
+    let request_count = match &parsed {
+        serde_json::Value::Array(batch) => {
+            if batch.is_empty() {
+                let resp = JsonRpcResponse::proxy_error("Empty batch request".to_string());
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::to_value(resp).unwrap()),
+                );
+            }
+            batch.len() as u64
+        }
+        serde_json::Value::Object(_) => 1,
+        _ => {
+            let resp = JsonRpcResponse::proxy_error(
+                "Request must be a JSON-RPC object or batch array".to_string(),
+            );
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::to_value(resp).unwrap()),
+            );
+        }
+    };
+
+    chain_state.metrics.record_requests(request_count);
 
     // First attempt
     let (idx, endpoint) = match chain_state.pool.next_endpoint() {
         Some(ep) => ep,
         None => {
-            chain_state.metrics.record_failure();
+            chain_state.metrics.record_failures(request_count);
             error!(chain = %chain, "All endpoints are unhealthy");
             let resp = JsonRpcResponse::proxy_error("All endpoints are unhealthy".to_string());
             return (
@@ -86,7 +121,7 @@ async fn proxy_handler(
     match chain_state.forwarder.forward(&endpoint_url, &body).await {
         Ok((_status, response_bytes)) => {
             chain_state.pool.record_success(idx);
-            chain_state.metrics.record_success();
+            chain_state.metrics.record_successes(request_count);
             let value: serde_json::Value =
                 serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
                     serde_json::to_value(JsonRpcResponse::proxy_error(
@@ -106,7 +141,7 @@ async fn proxy_handler(
     let (retry_idx, retry_endpoint) = match chain_state.pool.next_endpoint_excluding(idx) {
         Some(ep) => ep,
         None => {
-            chain_state.metrics.record_failure();
+            chain_state.metrics.record_failures(request_count);
             error!(chain = %chain, "No healthy endpoints available for retry");
             let resp =
                 JsonRpcResponse::proxy_error("All endpoints failed or unhealthy".to_string());
@@ -121,7 +156,7 @@ async fn proxy_handler(
     match chain_state.forwarder.forward(&retry_url, &body).await {
         Ok((_status, response_bytes)) => {
             chain_state.pool.record_success(retry_idx);
-            chain_state.metrics.record_success();
+            chain_state.metrics.record_successes(request_count);
             let value: serde_json::Value =
                 serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
                     serde_json::to_value(JsonRpcResponse::proxy_error(
@@ -134,7 +169,7 @@ async fn proxy_handler(
         Err(e) => {
             error!(chain = %chain, endpoint = %retry_url, error = %e, "Retry also failed");
             chain_state.pool.record_failure(retry_idx);
-            chain_state.metrics.record_failure();
+            chain_state.metrics.record_failures(request_count);
             let resp = JsonRpcResponse::proxy_error(format!("All attempts failed: {}", e));
             (
                 StatusCode::BAD_GATEWAY,

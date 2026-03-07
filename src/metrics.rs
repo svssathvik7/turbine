@@ -17,16 +17,16 @@ impl ChainMetrics {
         }
     }
 
-    pub fn record_request(&self) {
-        self.total_requests.fetch_add(1, Ordering::Relaxed);
+    pub fn record_requests(&self, count: u64) {
+        self.total_requests.fetch_add(count, Ordering::Relaxed);
     }
 
-    pub fn record_success(&self) {
-        self.successful_requests.fetch_add(1, Ordering::Relaxed);
+    pub fn record_successes(&self, count: u64) {
+        self.successful_requests.fetch_add(count, Ordering::Relaxed);
     }
 
-    pub fn record_failure(&self) {
-        self.failed_requests.fetch_add(1, Ordering::Relaxed);
+    pub fn record_failures(&self, count: u64) {
+        self.failed_requests.fetch_add(count, Ordering::Relaxed);
     }
 
     pub fn snapshot(&self, name: &str, active_endpoints: usize, total_endpoints: usize) -> ChainMetricsSnapshot {
