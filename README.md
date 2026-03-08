@@ -2,18 +2,58 @@
 
 Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxies, Turbine works with any blockchain that speaks JSON-RPC over HTTP.
 
+## How It Works
+
+```
+                         ┌─────────────────────────────────────────────────┐
+                         │                   TURBINE                      │
+                         │                                                │
+  Client Request         │  ┌─────────┐    ┌───────────┐    ┌─────────┐  │
+  POST /ethereum    ───────>│  Route   │───>│   Cache   │───>│ Forward │──│──> Endpoint A ✓ (auth injected)
+  POST /bitcoin          │  │ Resolve  │    │  Lookup   │    │ + Retry │  │
+  POST /solana           │  └─────────┘    └───────────┘    └─────────┘  │
+                         │       │          hit? │ miss        │    │     │
+                         │       │               │             │    │     │
+                         │       │          return cached    fail  retry  │
+                         │       │                             │    │     │
+                         │       │                             ▼    │     │
+                         │       │              ┌──────────────────┐│     │
+                         │       │              │   Endpoint Pool  ││     │
+                         │       │              │                  ││     │
+                         │       │              │  A ✓  B ✓  C ✗  │├─────│──> Endpoint B ✓ (auth injected)
+                         │       │              │  round-robin /   ││     │
+                         │       │              │  weighted select ││     │
+                         │       │              └──────────────────┘│     │
+                         │       │                      ▲           │     │
+                         │       │              ┌───────┴────────┐  │     │
+                         │       │              │ Health Checker  │  │     │
+                         │       ▼              │                 │  │     │
+                         │  ┌─────────┐         │ • block height  │  │     │
+                         │  │ Metrics │         │ • stale detect  │  │     │
+                         │  │ /metrics│         │ • auto-cooldown │  │     │
+                         │  └─────────┘         └─────────────────┘  │     │
+                         │                                                │
+                         └─────────────────────────────────────────────────┘
+
+  Flow: Request ──> Route to chain ──> Check cache ──> Pick healthy endpoint
+        ──> Inject auth (Basic/Bearer/Header) ──> Forward ──> On fail, retry next
+```
+
 ## Features
 
 - **Multi-chain** — configure any number of chains, each with its own endpoint pool
-- **Round-robin rotation** — distributes requests evenly across endpoints
+- **Round-robin & weighted rotation** — distribute requests evenly or by weight
 - **Passive health tracking** — automatically detects and skips failing endpoints
+- **Active health checks** — background block-height polling to detect stale nodes
 - **Auto-retry** — retries with a different endpoint on failure
-- **Metrics** — per-chain request/failure stats via `/metrics`
+- **Response caching** — per-method TTL cache with EVM/Solana presets
+- **Upstream authentication** — per-endpoint Basic Auth, Bearer tokens, or custom headers
+- **Metrics** — per-chain request/failure/cache stats via `/metrics`
 
 ## Install
 
 ```bash
-cargo add turbine
+cargo add turbine-rpc-proxy
 ```
 
 ## As a Library
@@ -23,21 +63,22 @@ use turbine::Turbine;
 
 #[tokio::main]
 async fn main() {
-    // Builder API — no config file needed
     let turbine = Turbine::builder()
         .add_chain("ethereum")
             .endpoint("https://eth.llamarpc.com")
             .endpoint("https://rpc.ankr.com/eth")
+            .endpoint_with_header("https://rpc.quicknode.com", "x-api-key", "key-123")
             .max_failures(3)
             .cooldown_secs(30)
             .done()
-        .add_chain("solana")
-            .endpoint("https://api.mainnet-beta.solana.com")
+        .add_chain("bitcoin")
+            .endpoint_with_basic_auth("http://node1:8332", "rpcuser", "pass1")
+            .endpoint_with_basic_auth("http://node2:8332", "rpcuser", "pass2")
+            .health_method("getblockcount")
             .done()
         .build()
         .unwrap();
 
-    // Run standalone
     turbine.serve("127.0.0.1:8080").await.unwrap();
 }
 ```
@@ -53,19 +94,14 @@ let router = turbine.into_router();
 ## As a CLI
 
 ```bash
-# Build
 cargo build --release
-
-# Run with default config
 ./target/release/turbine --config config.toml
-
-# Or with overrides
 ./target/release/turbine --config config.toml --port 9090 --log-level debug
 ```
 
 ## Configuration
 
-See [config.toml](config.toml) for a sample configuration.
+See [config.toml](config.toml) for a sample configuration. Generate one visually at [turbine-config.pages.dev](https://turbine-config.pages.dev).
 
 ```toml
 [server]
@@ -77,17 +113,40 @@ name = "ethereum"
 route = "/ethereum"
 endpoints = [
     "https://eth.llamarpc.com",
-    "https://rpc.ankr.com/eth",
+    { url = "https://rpc.quicknode.com", auth = { header = { name = "x-api-key", value = "key-123" } } },
 ]
 
 [chains.health]
 max_consecutive_failures = 3
 cooldown_seconds = 30
+
+[[chains]]
+name = "bitcoin"
+route = "/bitcoin"
+endpoints = [
+    { url = "http://node1:8332", auth = { basic = { username = "rpcuser", password = "pass1" } } },
+    { url = "http://node2:8332", auth = { basic = { username = "rpcuser", password = "pass2" } } },
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_method = "getblockcount"
 ```
 
-## Usage
+### Authentication
 
-Send JSON-RPC requests to `http://localhost:8080/<chain>`:
+Auth is optional per-endpoint. Three methods are supported:
+
+| Method | Config | Use Case |
+|---|---|---|
+| Basic Auth | `{ basic = { username, password } }` | Bitcoin Core, self-hosted nodes |
+| Bearer Token | `{ bearer = "token" }` | Managed RPC providers |
+| Custom Header | `{ header = { name, value } }` | Alchemy (`x-api-key`), QuickNode |
+
+Clients don't need credentials — Turbine injects them automatically when forwarding to upstream nodes.
+
+## Usage
 
 ```bash
 # Ethereum
@@ -95,10 +154,10 @@ curl -X POST http://localhost:8080/ethereum \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
-# Solana
-curl -X POST http://localhost:8080/solana \
+# Bitcoin (auth handled by Turbine, client sends plain request)
+curl -X POST http://localhost:8080/bitcoin \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"getSlot","params":[],"id":1}'
+  -d '{"jsonrpc":"2.0","method":"getblockcount","params":[],"id":1}'
 
 # Metrics
 curl http://localhost:8080/metrics
