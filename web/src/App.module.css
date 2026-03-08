@@ -1,0 +1,75 @@
+.layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chainList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.addChainBtn {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px dashed var(--color-border);
+  padding: 12px;
+  font-size: 0.9rem;
+  border-radius: var(--radius);
+  width: 100%;
+}
+
+.addChainBtn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-2);
+}
+
+.preview {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 900px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .preview {
+    position: static;
+  }
+}

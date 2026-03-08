@@ -1,0 +1,50 @@
+.section {
+  margin-top: 16px;
+}
+
+.header {
+  margin-bottom: 8px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.urlInput {
+  flex: 1;
+}
+
+.weightInput {
+  width: 80px;
+}
+
+.removeBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.removeBtn:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.removeBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.addBtn {
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  padding: 6px 0;
+}
+
+.addBtn:hover {
+  color: var(--color-primary-hover);
+}
