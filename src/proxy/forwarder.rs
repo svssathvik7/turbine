@@ -1,3 +1,4 @@
+use crate::config::EndpointAuth;
 use reqwest::Client;
 use std::time::Duration;
 
@@ -19,23 +20,33 @@ impl Forwarder {
         &self,
         endpoint: &str,
         body: &[u8],
+        auth: Option<&EndpointAuth>,
     ) -> Result<(u16, bytes::Bytes), ForwardError> {
-        let response = self
+        let mut req = self
             .client
             .post(endpoint)
             .header("Content-Type", "application/json")
-            .body(body.to_vec())
-            .send()
-            .await
-            .map_err(|e| {
-                if e.is_timeout() {
-                    ForwardError::Timeout
-                } else if e.is_connect() {
-                    ForwardError::ConnectionFailed(e.to_string())
-                } else {
-                    ForwardError::RequestFailed(e.to_string())
+            .body(body.to_vec());
+
+        if let Some(auth) = auth {
+            req = match auth {
+                EndpointAuth::Basic { username, password } => {
+                    req.basic_auth(username, Some(password))
                 }
-            })?;
+                EndpointAuth::Bearer(token) => req.bearer_auth(token),
+                EndpointAuth::Header { name, value } => req.header(name, value),
+            };
+        }
+
+        let response = req.send().await.map_err(|e| {
+            if e.is_timeout() {
+                ForwardError::Timeout
+            } else if e.is_connect() {
+                ForwardError::ConnectionFailed(e.to_string())
+            } else {
+                ForwardError::RequestFailed(e.to_string())
+            }
+        })?;
 
         let status = response.status().as_u16();
 
