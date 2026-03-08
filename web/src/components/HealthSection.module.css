@@ -1,14 +1,27 @@
 .section {
-  margin-top: 8px;
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .field {
   display: flex;
   flex-direction: column;
+}
+
+.hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }
