@@ -31,13 +31,32 @@ pub struct ChainConfig {
 #[serde(untagged)]
 enum EndpointRaw {
     Simple(String),
-    Full { url: String, #[serde(default = "default_weight")] weight: u32 },
+    Full {
+        url: String,
+        #[serde(default = "default_weight")]
+        weight: u32,
+        #[serde(default)]
+        auth: Option<EndpointAuth>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub struct EndpointConfig {
     pub url: String,
     pub weight: u32,
+    pub auth: Option<EndpointAuth>,
+}
+
+/// Authentication credentials for an upstream RPC endpoint.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointAuth {
+    /// HTTP Basic Auth (username + password). Used by Bitcoin Core and self-hosted nodes.
+    Basic { username: String, password: String },
+    /// Bearer token sent via `Authorization: Bearer <token>` header.
+    Bearer(String),
+    /// Custom header (e.g., `x-api-key`).
+    Header { name: String, value: String },
 }
 
 fn default_weight() -> u32 {
@@ -51,8 +70,8 @@ impl<'de> Deserialize<'de> for EndpointConfig {
     {
         let raw = EndpointRaw::deserialize(deserializer).map_err(de::Error::custom)?;
         Ok(match raw {
-            EndpointRaw::Simple(url) => EndpointConfig { url, weight: default_weight() },
-            EndpointRaw::Full { url, weight } => EndpointConfig { url, weight },
+            EndpointRaw::Simple(url) => EndpointConfig { url, weight: default_weight(), auth: None },
+            EndpointRaw::Full { url, weight, auth } => EndpointConfig { url, weight, auth },
         })
     }
 }

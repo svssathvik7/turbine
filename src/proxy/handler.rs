@@ -276,7 +276,8 @@ async fn forward_with_retry(
     };
 
     let endpoint_url = endpoint.to_string();
-    match chain_state.forwarder.forward(&endpoint_url, body).await {
+    let auth = chain_state.pool.endpoints[idx].auth.as_ref();
+    match chain_state.forwarder.forward(&endpoint_url, body, auth).await {
         Ok((_status, response_bytes)) => {
             chain_state.pool.record_success(idx);
             chain_state.metrics.record_successes(request_count);
@@ -311,7 +312,8 @@ async fn forward_with_retry(
     };
 
     let retry_url = retry_endpoint.to_string();
-    match chain_state.forwarder.forward(&retry_url, body).await {
+    let retry_auth = chain_state.pool.endpoints[retry_idx].auth.as_ref();
+    match chain_state.forwarder.forward(&retry_url, body, retry_auth).await {
         Ok((_status, response_bytes)) => {
             chain_state.pool.record_success(retry_idx);
             chain_state.metrics.record_successes(request_count);

@@ -1,5 +1,5 @@
 use super::ChainPool;
-use crate::config::default_health_method;
+use crate::config::{default_health_method, EndpointAuth};
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
@@ -87,14 +87,14 @@ async fn fetch_block_heights(
     let mut results = Vec::with_capacity(pool.endpoints.len());
 
     for (idx, endpoint) in pool.endpoints.iter().enumerate() {
-        let height = fetch_block_height(client, &endpoint.url, method).await;
+        let height = fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
         results.push((idx, height));
     }
 
     results
 }
 
-async fn fetch_block_height(client: &Client, endpoint: &str, method: &str) -> Option<u64> {
+async fn fetch_block_height(client: &Client, endpoint: &str, method: &str, auth: Option<&EndpointAuth>) -> Option<u64> {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "method": method,
@@ -102,13 +102,20 @@ async fn fetch_block_height(client: &Client, endpoint: &str, method: &str) -> Op
         "id": 1
     });
 
-    let response = client
+    let mut req = client
         .post(endpoint)
         .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .ok()?;
+        .json(&body);
+
+    if let Some(auth) = auth {
+        req = match auth {
+            EndpointAuth::Basic { username, password } => req.basic_auth(username, Some(password)),
+            EndpointAuth::Bearer(token) => req.bearer_auth(token),
+            EndpointAuth::Header { name, value } => req.header(name, value),
+        };
+    }
+
+    let response = req.send().await.ok()?;
 
     let json: serde_json::Value = response.json().await.ok()?;
 
