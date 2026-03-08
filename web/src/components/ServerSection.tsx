@@ -1,4 +1,5 @@
 import type { Dispatch } from "react";
+import { Server } from "lucide-react";
 import type { ServerConfig } from "../types";
 import styles from "./ServerSection.module.css";
 
@@ -10,11 +11,15 @@ interface Props {
 export function ServerSection({ server, dispatch }: Props) {
   return (
     <div className={styles.section}>
-      <h3 className={styles.title}>Server</h3>
+      <h3 className={styles.title}>
+        <Server size={16} />
+        Server
+      </h3>
       <div className={styles.row}>
         <div className={styles.field}>
-          <label>Host</label>
+          <label htmlFor="server-host">Host</label>
           <input
+            id="server-host"
             type="text"
             value={server.host}
             onChange={(e) =>
@@ -24,8 +29,9 @@ export function ServerSection({ server, dispatch }: Props) {
           />
         </div>
         <div className={styles.fieldSmall}>
-          <label>Port</label>
+          <label htmlFor="server-port">Port</label>
           <input
+            id="server-port"
             type="number"
             value={server.port}
             onChange={(e) =>

@@ -1,4 +1,5 @@
 import type { Dispatch } from "react";
+import { X, Plus } from "lucide-react";
 import type { CacheConfig } from "../types";
 import { getDefaultCachePreset } from "../defaults";
 import styles from "./CacheSection.module.css";
@@ -20,6 +21,9 @@ export function CacheSection({ cache, chainName, chainIndex, dispatch }: Props) 
         <button
           className={`${styles.toggle} ${cache ? styles.toggleOn : ""}`}
           onClick={() => dispatch({ type: "TOGGLE_CACHE", chainIndex })}
+          role="switch"
+          aria-checked={!!cache}
+          aria-label="Toggle cache"
         >
           <span className={styles.toggleKnob} />
         </button>
@@ -29,8 +33,11 @@ export function CacheSection({ cache, chainName, chainIndex, dispatch }: Props) 
         <div className={styles.content}>
           <div className={styles.grid}>
             <div className={styles.field}>
-              <label>Preset {!chainName && `(default: ${defaultPreset})`}</label>
+              <label htmlFor={`cache-${chainIndex}-preset`}>
+                Preset {!chainName && `(default: ${defaultPreset})`}
+              </label>
               <select
+                id={`cache-${chainIndex}-preset`}
                 value={cache.preset}
                 onChange={(e) =>
                   dispatch({
@@ -46,8 +53,9 @@ export function CacheSection({ cache, chainName, chainIndex, dispatch }: Props) 
               </select>
             </div>
             <div className={styles.field}>
-              <label>Max Capacity</label>
+              <label htmlFor={`cache-${chainIndex}-capacity`}>Max Capacity</label>
               <input
+                id={`cache-${chainIndex}-capacity`}
                 type="number"
                 value={cache.max_capacity}
                 min={1}
@@ -103,8 +111,9 @@ export function CacheSection({ cache, chainName, chainIndex, dispatch }: Props) 
                       methodIndex: i,
                     })
                   }
+                  aria-label="Remove method override"
                 >
-                  &times;
+                  <X size={14} />
                 </button>
               </div>
             ))}
@@ -112,7 +121,8 @@ export function CacheSection({ cache, chainName, chainIndex, dispatch }: Props) 
               className={styles.addBtn}
               onClick={() => dispatch({ type: "ADD_CACHE_METHOD", chainIndex })}
             >
-              + Add Method Override
+              <Plus size={14} />
+              Add Method Override
             </button>
           </div>
         </div>

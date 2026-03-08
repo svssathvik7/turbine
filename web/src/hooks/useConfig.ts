@@ -1,9 +1,29 @@
-import { useReducer, useMemo } from "react";
+import { useReducer, useMemo, useEffect, useRef, useCallback } from "react";
 import type { TurbineConfig } from "../types";
-import { createDefaultChain, createDefaultCache, generateRoute } from "../defaults";
+import { createDefaultChain, createDefaultCache, generateRoute, createDefaultConfig } from "../defaults";
 import { serializeConfig } from "../toml";
 
-type Action =
+const STORAGE_KEY = "turbine-config";
+
+function loadFromStorage(): TurbineConfig | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as TurbineConfig;
+  } catch {
+    // ignore corrupt data
+  }
+  return null;
+}
+
+function saveToStorage(config: TurbineConfig): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export type Action =
   | { type: "SET_SERVER_HOST"; payload: string }
   | { type: "SET_SERVER_PORT"; payload: number }
   | { type: "ADD_CHAIN" }
@@ -22,7 +42,8 @@ type Action =
   | { type: "ADD_CACHE_METHOD"; chainIndex: number }
   | { type: "REMOVE_CACHE_METHOD"; chainIndex: number; methodIndex: number }
   | { type: "SET_CACHE_METHOD_NAME"; chainIndex: number; methodIndex: number; payload: string }
-  | { type: "SET_CACHE_METHOD_TTL"; chainIndex: number; methodIndex: number; payload: number };
+  | { type: "SET_CACHE_METHOD_TTL"; chainIndex: number; methodIndex: number; payload: number }
+  | { type: "RESET_CONFIG" };
 
 function updateChain(
   state: TurbineConfig,
@@ -149,13 +170,40 @@ function reducer(state: TurbineConfig, action: Action): TurbineConfig {
           : null,
       }));
 
+    case "RESET_CONFIG": {
+      localStorage.removeItem(STORAGE_KEY);
+      return createDefaultConfig();
+    }
+
     default:
       return state;
   }
 }
 
 export function useConfig(initialConfig: TurbineConfig) {
-  const [config, dispatch] = useReducer(reducer, initialConfig);
+  const [config, dispatch] = useReducer(reducer, initialConfig, () => {
+    return loadFromStorage() ?? initialConfig;
+  });
+
   const toml = useMemo(() => serializeConfig(config), [config]);
-  return { config, dispatch, toml };
+
+  // Debounced save to localStorage
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => saveToStorage(config), 300);
+    return () => clearTimeout(timerRef.current);
+  }, [config]);
+
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([toml], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "config.toml";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [toml]);
+
+  return { config, dispatch, toml, handleDownload };
 }
