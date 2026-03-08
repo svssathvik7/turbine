@@ -15,10 +15,12 @@
 
 .urlInput {
   flex: 1;
+  min-width: 0;
 }
 
 .weightInput {
   width: 80px;
+  flex-shrink: 0;
 }
 
 .removeBtn {
