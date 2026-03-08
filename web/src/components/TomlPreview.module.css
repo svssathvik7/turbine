@@ -1,0 +1,49 @@
+.panel {
+  background: var(--color-code-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 400px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.copyBtn {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  padding: 5px 14px;
+  border: 1px solid var(--color-border);
+}
+
+.copyBtn:hover {
+  background: var(--color-border);
+}
+
+.code {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--color-text);
+  white-space: pre;
+  tab-size: 2;
+}

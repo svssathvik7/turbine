@@ -1,0 +1,26 @@
+.section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.field {
+  flex: 1;
+}
+
+.fieldSmall {
+  width: 120px;
+}

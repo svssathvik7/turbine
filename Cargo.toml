@@ -1,5 +1,5 @@
 [package]
-name = "turbine"
+name = "turbine-rpc-proxy"
 version = "0.1.0"
 edition = "2021"
 description = "Multi-chain RPC proxy with intelligent endpoint rotation"

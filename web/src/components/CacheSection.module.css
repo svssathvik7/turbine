@@ -1,0 +1,102 @@
+.section {
+  margin-top: 8px;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.toggleLabel {
+  margin-bottom: 0;
+}
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--color-border);
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.toggleOn {
+  background: var(--color-primary);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-text);
+  transition: transform 0.2s;
+}
+
+.toggleOn .toggleKnob {
+  transform: translateX(20px);
+}
+
+.content {
+  padding-top: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.methods {
+  margin-top: 4px;
+}
+
+.methodRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.methodRow input[type="text"] {
+  flex: 1;
+}
+
+.ttlInput {
+  width: 100px;
+}
+
+.removeBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.2rem;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.removeBtn:hover {
+  color: var(--color-danger);
+}
+
+.addBtn {
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  padding: 6px 0;
+  margin-top: 8px;
+}
+
+.addBtn:hover {
+  color: var(--color-primary-hover);
+}
