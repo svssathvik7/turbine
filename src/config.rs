@@ -129,6 +129,8 @@ pub fn default_health_method(chain_name: &str) -> &'static str {
         "getSlot"
     } else if name.contains("starknet") {
         "starknet_blockNumber"
+    } else if name.contains("bitcoin") || name.contains("btc") {
+        "getblockcount"
     } else if name.contains("aptos") || name.contains("sui") {
         // Aptos/Sui use different APIs, but for JSON-RPC based:
         "eth_blockNumber"
