@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 pub struct AppState {
     pub chains: HashMap<String, ChainState>,
+    pub started_at: std::time::Instant,
 }
 
 pub struct ChainState {

@@ -16,12 +16,14 @@ impl Forwarder {
         Self { client }
     }
 
+    /// Forwards a request to an upstream endpoint.
+    /// Returns (status_code, response_bytes, latency_ms).
     pub async fn forward(
         &self,
         endpoint: &str,
         body: &[u8],
         auth: Option<&EndpointAuth>,
-    ) -> Result<(u16, bytes::Bytes), ForwardError> {
+    ) -> Result<(u16, bytes::Bytes, u64), ForwardError> {
         let mut req = self
             .client
             .post(endpoint)
@@ -38,6 +40,8 @@ impl Forwarder {
             };
         }
 
+        let start = std::time::Instant::now();
+
         let response = req.send().await.map_err(|e| {
             if e.is_timeout() {
                 ForwardError::Timeout
@@ -48,6 +52,7 @@ impl Forwarder {
             }
         })?;
 
+        let latency_ms = start.elapsed().as_millis() as u64;
         let status = response.status().as_u16();
 
         if status == 429 {
@@ -63,7 +68,7 @@ impl Forwarder {
             .await
             .map_err(|e| ForwardError::RequestFailed(e.to_string()))?;
 
-        Ok((status, bytes))
+        Ok((status, bytes, latency_ms))
     }
 }
 

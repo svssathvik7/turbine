@@ -54,6 +54,7 @@ pub fn spawn_health_checker(
                             lag = max_height - h,
                             "Endpoint is stale, marking unhealthy"
                         );
+                        pool.update_block_height(*idx, *h);
                         pool.mark_stale(*idx);
                     }
                     Some(h) => {
@@ -63,6 +64,7 @@ pub fn spawn_health_checker(
                             block_height = h,
                             "Endpoint healthy"
                         );
+                        pool.update_block_height(*idx, *h);
                         // If it was previously stale but now caught up, re-enable it
                         pool.record_success(*idx);
                     }
@@ -87,7 +89,12 @@ async fn fetch_block_heights(
     let mut results = Vec::with_capacity(pool.endpoints.len());
 
     for (idx, endpoint) in pool.endpoints.iter().enumerate() {
+        let start = std::time::Instant::now();
         let height = fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
+        let latency_ms = start.elapsed().as_millis() as u64;
+        if height.is_some() {
+            pool.update_latency(idx, latency_ms);
+        }
         results.push((idx, height));
     }
 

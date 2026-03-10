@@ -1,6 +1,6 @@
 [package]
 name = "turbine-rpc-proxy"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = "Multi-chain RPC proxy with intelligent endpoint rotation"
 license = "MIT"
