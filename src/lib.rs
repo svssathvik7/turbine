@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod config;
+pub mod dashboard;
 pub mod health;
 pub mod metrics;
 pub mod proxy;

@@ -1,3 +1,4 @@
+use super::state::EndpointStatus;
 use super::EndpointHealth;
 use crate::config::{ChainConfig, EndpointConfig, HealthConfig, RotationStrategy};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -194,5 +195,60 @@ impl ChainPool {
 
     pub fn total_weight(&self) -> u32 {
         self.total_weight
+    }
+
+    pub fn update_block_height(&self, idx: usize, height: u64) {
+        let mut health = self.health.write().unwrap();
+        health[idx].update_block_height(height);
+    }
+
+    pub fn update_latency(&self, idx: usize, latency_ms: u64) {
+        let mut health = self.health.write().unwrap();
+        health[idx].update_latency(latency_ms);
+    }
+
+    pub fn record_success_with_latency(&self, idx: usize, latency_ms: u64) {
+        let mut health = self.health.write().unwrap();
+        health[idx].record_success();
+        health[idx].update_latency(latency_ms);
+    }
+
+    pub fn rotation_name(&self) -> &str {
+        match self.rotation {
+            RotationStrategy::RoundRobin => "round_robin",
+            RotationStrategy::Weighted => "weighted",
+        }
+    }
+
+    pub fn endpoint_statuses(&self) -> Vec<EndpointStatus> {
+        let health = self.health.read().unwrap();
+        self.endpoints
+            .iter()
+            .enumerate()
+            .map(|(i, ep)| {
+                let h = &health[i];
+                EndpointStatus {
+                    url: redact_url(&ep.url),
+                    weight: ep.weight,
+                    is_healthy: h.is_healthy,
+                    consecutive_failures: h.consecutive_failures,
+                    block_height: h.block_height,
+                    last_latency_ms: h.last_latency_ms,
+                    rolling_latency_ms: h.rolling_latency_ms,
+                    request_count: h.request_count,
+                    success_count: h.success_count,
+                    failure_count: h.failure_count,
+                }
+            })
+            .collect()
+    }
+}
+
+/// Redact query parameters from URLs to avoid leaking API keys in the dashboard.
+fn redact_url(url: &str) -> String {
+    if let Some(pos) = url.find('?') {
+        format!("{}?...", &url[..pos])
+    } else {
+        url.to_string()
     }
 }

@@ -278,8 +278,8 @@ async fn forward_with_retry(
     let endpoint_url = endpoint.to_string();
     let auth = chain_state.pool.endpoints[idx].auth.as_ref();
     match chain_state.forwarder.forward(&endpoint_url, body, auth).await {
-        Ok((_status, response_bytes)) => {
-            chain_state.pool.record_success(idx);
+        Ok((_status, response_bytes, latency_ms)) => {
+            chain_state.pool.record_success_with_latency(idx, latency_ms);
             chain_state.metrics.record_successes(request_count);
             let value: serde_json::Value =
                 serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
@@ -314,8 +314,8 @@ async fn forward_with_retry(
     let retry_url = retry_endpoint.to_string();
     let retry_auth = chain_state.pool.endpoints[retry_idx].auth.as_ref();
     match chain_state.forwarder.forward(&retry_url, body, retry_auth).await {
-        Ok((_status, response_bytes)) => {
-            chain_state.pool.record_success(retry_idx);
+        Ok((_status, response_bytes, latency_ms)) => {
+            chain_state.pool.record_success_with_latency(retry_idx, latency_ms);
             chain_state.metrics.record_successes(request_count);
             let value: serde_json::Value =
                 serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
