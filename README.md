@@ -44,7 +44,7 @@ Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxie
                          └─────────────────────────────────────────────────┘
 
   Flow: Request ──> Route to chain ──> Check cache ──> Pick healthy endpoint
-        ──> Inject auth (Basic/Bearer/Header) ──> Forward ──> On fail, retry next
+        ──> Inject auth (Basic/Bearer/Header) ──> Forward ──> Hedge if slow ──> On fail, retry next
 ```
 
 ## Features
@@ -54,6 +54,7 @@ Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxie
 - **Passive health tracking** — automatically detects and skips failing endpoints
 - **Active health checks** — background block-height polling to detect stale nodes
 - **Configurable retries** — set max retries and delay per chain, with automatic endpoint exclusion
+- **Hedged requests** — fire parallel requests after a configurable delay to reduce tail latency
 - **Per-chain rate limiting** — configurable request quotas per time window
 - **Chain ID routing** — route by EVM chain ID (e.g., `/1`, `/8453`) in addition to path names
 - **Response caching** — per-method TTL cache with EVM/Solana presets
@@ -93,6 +94,7 @@ async fn main() {
             .cooldown_secs(30)
             .cache(true)
             .cache_preset("evm")
+            .hedge(500, 1)
             .done()
         .add_chain("bitcoin")
             .endpoint_with_basic_auth("http://node1:8332", "rpcuser", "pass1")
@@ -148,6 +150,10 @@ retry_delay_ms = 100               # wait 100ms between retries (default: 0)
 [chains.rate_limit]
 max_requests = 100                 # max requests per window
 window_seconds = 60                # time window in seconds
+
+[chains.hedge]
+delay_ms = 500                     # fire hedge after 500ms with no response
+max_count = 1                      # max 1 additional parallel request
 
 [chains.cache]
 enabled = true
@@ -252,6 +258,15 @@ preset = "solana"
 | `window_seconds` | integer | required | Time window in seconds |
 
 Rate limiting is optional per-chain. When configured, requests exceeding the limit receive HTTP 429.
+
+#### `[chains.hedge]`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `delay_ms` | integer | required | Milliseconds to wait before firing a hedge request |
+| `max_count` | integer | `1` | Maximum number of additional parallel requests |
+
+Hedging is optional per-chain and requires at least 2 endpoints. When the primary request doesn't respond within `delay_ms`, a parallel request is sent to a different endpoint — whichever responds first wins. This dramatically reduces tail latency (p99) with minimal extra upstream load.
 
 #### `[chains.cache]`
 
@@ -416,6 +431,7 @@ Turbine::builder()
         .cache_method("eth_blockNumber", 5)         // custom method TTL
         .chain_id(1)                                // EVM chain ID for /{id} routing
         .rate_limit(100, 60)                        // 100 requests per 60 seconds
+        .hedge(500, 1)                              // hedge after 500ms, max 1 extra request
         .max_retries(2)                             // retry up to 2 times on failure
         .retry_delay_ms(100)                        // 100ms between retries
         .done()                                     // finish chain, return to builder

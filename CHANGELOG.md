@@ -2,6 +2,15 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-03-12
+
+### Added
+
+- Hedged requests: fire parallel requests after configurable delay to reduce tail latency
+- New `[chains.hedge]` config section with `delay_ms` and `max_count`
+- Builder API method: `.hedge(delay_ms, max_count)`
+- `hedged_requests` counter in metrics and status API
+
 ## [0.4.0] - 2026-03-12
 
 ### Added

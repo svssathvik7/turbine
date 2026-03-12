@@ -9,6 +9,7 @@ pub struct ChainMetrics {
     pub cache_hits: AtomicU64,
     pub cache_misses: AtomicU64,
     pub rate_limited_requests: AtomicU64,
+    pub hedged_requests: AtomicU64,
 }
 
 impl Default for ChainMetrics {
@@ -26,6 +27,7 @@ impl ChainMetrics {
             cache_hits: AtomicU64::new(0),
             cache_misses: AtomicU64::new(0),
             rate_limited_requests: AtomicU64::new(0),
+            hedged_requests: AtomicU64::new(0),
         }
     }
 
@@ -53,6 +55,10 @@ impl ChainMetrics {
         self.rate_limited_requests.fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn record_hedged_requests(&self, count: u64) {
+        self.hedged_requests.fetch_add(count, Ordering::Relaxed);
+    }
+
     pub fn snapshot(
         &self,
         name: &str,
@@ -67,6 +73,7 @@ impl ChainMetrics {
             cache_hits: self.cache_hits.load(Ordering::Relaxed),
             cache_misses: self.cache_misses.load(Ordering::Relaxed),
             rate_limited_requests: self.rate_limited_requests.load(Ordering::Relaxed),
+            hedged_requests: self.hedged_requests.load(Ordering::Relaxed),
             active_endpoints,
             total_endpoints,
         }
@@ -82,6 +89,7 @@ pub struct ChainMetricsSnapshot {
     pub cache_hits: u64,
     pub cache_misses: u64,
     pub rate_limited_requests: u64,
+    pub hedged_requests: u64,
     pub active_endpoints: usize,
     pub total_endpoints: usize,
 }

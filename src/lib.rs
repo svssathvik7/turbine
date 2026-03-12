@@ -8,7 +8,7 @@ pub mod types;
 
 use config::{
     CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointAuth, EndpointConfig,
-    HealthConfig, RateLimitConfig, RotationStrategy, ServerConfig,
+    HealthConfig, HedgeConfig, RateLimitConfig, RotationStrategy, ServerConfig,
 };
 use proxy::build_router;
 use std::path::Path;
@@ -40,6 +40,8 @@ pub struct ChainBuilder {
     retry_delay_ms: u64,
     rate_limit_max_requests: Option<u32>,
     rate_limit_window_seconds: Option<u64>,
+    hedge_delay_ms: Option<u64>,
+    hedge_max_count: Option<u32>,
     parent: TurbineBuilder,
 }
 
@@ -107,6 +109,8 @@ impl TurbineBuilder {
             retry_delay_ms: 0,
             rate_limit_max_requests: None,
             rate_limit_window_seconds: None,
+            hedge_delay_ms: None,
+            hedge_max_count: None,
             parent: self,
         }
     }
@@ -279,6 +283,14 @@ impl ChainBuilder {
         self
     }
 
+    /// Enable hedged requests. After `delay_ms`, fire up to `max_count` additional
+    /// parallel requests to different endpoints. First success wins.
+    pub fn hedge(mut self, delay_ms: u64, max_count: u32) -> Self {
+        self.hedge_delay_ms = Some(delay_ms);
+        self.hedge_max_count = Some(max_count);
+        self
+    }
+
     /// Finish configuring this chain and return to the builder.
     pub fn done(self) -> TurbineBuilder {
         let cache = if self.cache_enabled {
@@ -300,6 +312,11 @@ impl ChainBuilder {
             _ => None,
         };
 
+        let hedge = self.hedge_delay_ms.map(|delay_ms| HedgeConfig {
+            delay_ms,
+            max_count: self.hedge_max_count.unwrap_or(1),
+        });
+
         let chain = ChainConfig {
             name: self.name,
             route: self.route,
@@ -317,6 +334,7 @@ impl ChainBuilder {
             cache,
             chain_id: self.chain_id,
             rate_limit,
+            hedge,
         };
         let mut parent = self.parent;
         parent.chains.push(chain);
