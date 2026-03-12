@@ -8,6 +8,7 @@ pub struct ChainMetrics {
     pub failed_requests: AtomicU64,
     pub cache_hits: AtomicU64,
     pub cache_misses: AtomicU64,
+    pub rate_limited_requests: AtomicU64,
 }
 
 impl Default for ChainMetrics {
@@ -24,6 +25,7 @@ impl ChainMetrics {
             failed_requests: AtomicU64::new(0),
             cache_hits: AtomicU64::new(0),
             cache_misses: AtomicU64::new(0),
+            rate_limited_requests: AtomicU64::new(0),
         }
     }
 
@@ -47,6 +49,10 @@ impl ChainMetrics {
         self.cache_misses.fetch_add(1, Ordering::Relaxed);
     }
 
+    pub fn record_rate_limited(&self) {
+        self.rate_limited_requests.fetch_add(1, Ordering::Relaxed);
+    }
+
     pub fn snapshot(
         &self,
         name: &str,
@@ -60,6 +66,7 @@ impl ChainMetrics {
             failed_requests: self.failed_requests.load(Ordering::Relaxed),
             cache_hits: self.cache_hits.load(Ordering::Relaxed),
             cache_misses: self.cache_misses.load(Ordering::Relaxed),
+            rate_limited_requests: self.rate_limited_requests.load(Ordering::Relaxed),
             active_endpoints,
             total_endpoints,
         }
@@ -74,6 +81,7 @@ pub struct ChainMetricsSnapshot {
     pub failed_requests: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
+    pub rate_limited_requests: u64,
     pub active_endpoints: usize,
     pub total_endpoints: usize,
 }

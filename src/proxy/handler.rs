@@ -13,16 +13,28 @@ pub async fn proxy_handler(
     Path(chain): Path<String>,
     body: Bytes,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let chain_state = match state.chains.get(&chain) {
-        Some(s) => s,
-        None => {
-            let resp = JsonRpcResponse::proxy_error(format!("Unknown chain: {}", chain));
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::to_value(resp).unwrap()),
-            );
+    let chain_key = if state.chains.contains_key(&chain) {
+        chain.clone()
+    } else if let Ok(id) = chain.parse::<u64>() {
+        match state.chain_id_map.get(&id) {
+            Some(key) => key.clone(),
+            None => {
+                let resp = JsonRpcResponse::proxy_error(format!("Unknown chain: {}", chain));
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::to_value(resp).unwrap()),
+                );
+            }
         }
+    } else {
+        let resp = JsonRpcResponse::proxy_error(format!("Unknown chain: {}", chain));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::to_value(resp).unwrap()),
+        );
     };
+
+    let chain_state = state.chains.get(&chain_key).unwrap();
 
     // Parse body to detect batch vs single and count requests
     let parsed: serde_json::Value = match serde_json::from_slice(&body) {
@@ -62,6 +74,18 @@ pub async fn proxy_handler(
     };
 
     chain_state.metrics.record_requests(request_count);
+
+    // Rate limiting
+    if let Some(ref limiter) = chain_state.rate_limiter {
+        if limiter.check().is_err() {
+            chain_state.metrics.record_rate_limited();
+            let resp = JsonRpcResponse::proxy_error("Rate limit exceeded".to_string());
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(serde_json::to_value(resp).unwrap()),
+            );
+        }
+    }
 
     // --- Cache logic ---
     if let Some(cache) = &chain_state.cache {
@@ -249,99 +273,84 @@ async fn handle_batch_with_cache(
     )
 }
 
-/// Forward a request to upstream with one retry on failure.
+/// Forward a request to upstream with configurable retries.
 async fn forward_with_retry(
     chain_state: &ChainState,
     body: &[u8],
     chain: &str,
     request_count: u64,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    // First attempt
-    let (idx, endpoint) = match chain_state.pool.next_endpoint() {
-        Some(ep) => ep,
-        None => {
-            chain_state.metrics.record_failures(request_count);
-            error!(chain = %chain, "All endpoints are unhealthy");
-            let resp = JsonRpcResponse::proxy_error("All endpoints are unhealthy".to_string());
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::to_value(resp).unwrap()),
-            );
-        }
-    };
+    let max_retries = chain_state.pool.health_config.max_retries;
+    let retry_delay_ms = chain_state.pool.health_config.retry_delay_ms;
+    let total_attempts = max_retries + 1;
+    let mut excluded: Vec<usize> = Vec::new();
+    let mut last_error = String::new();
 
-    let endpoint_url = endpoint.to_string();
-    let auth = chain_state.pool.endpoints[idx].auth.as_ref();
-    match chain_state
-        .forwarder
-        .forward(&endpoint_url, body, auth)
-        .await
-    {
-        Ok((_status, response_bytes, latency_ms)) => {
+    for attempt in 0..total_attempts {
+        if attempt > 0 && retry_delay_ms > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(retry_delay_ms)).await;
+        }
+
+        let endpoint_result = if excluded.is_empty() {
+            chain_state.pool.next_endpoint()
+        } else {
             chain_state
                 .pool
-                .record_success_with_latency(idx, latency_ms);
-            chain_state.metrics.record_successes(request_count);
-            let value: serde_json::Value =
-                serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
-                    serde_json::to_value(JsonRpcResponse::proxy_error(
-                        "Invalid JSON response from upstream".to_string(),
-                    ))
-                    .unwrap()
-                });
-            return (StatusCode::OK, Json(value));
-        }
-        Err(e) => {
-            warn!(chain = %chain, endpoint = %endpoint_url, error = %e, "Request failed, retrying");
-            chain_state.pool.record_failure(idx);
+                .next_endpoint_excluding_many(&excluded)
+                .or_else(|| chain_state.pool.next_endpoint())
+        };
+
+        let (idx, endpoint) = match endpoint_result {
+            Some(ep) => ep,
+            None => {
+                chain_state.metrics.record_failures(request_count);
+                error!(chain = %chain, "All endpoints are unhealthy");
+                let resp = JsonRpcResponse::proxy_error("All endpoints are unhealthy".to_string());
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(serde_json::to_value(resp).unwrap()),
+                );
+            }
+        };
+
+        let endpoint_url = endpoint.to_string();
+        let auth = chain_state.pool.endpoints[idx].auth.as_ref();
+        match chain_state
+            .forwarder
+            .forward(&endpoint_url, body, auth)
+            .await
+        {
+            Ok((_status, response_bytes, latency_ms)) => {
+                chain_state
+                    .pool
+                    .record_success_with_latency(idx, latency_ms);
+                chain_state.metrics.record_successes(request_count);
+                let value: serde_json::Value = serde_json::from_slice(&response_bytes)
+                    .unwrap_or_else(|_| {
+                        serde_json::to_value(JsonRpcResponse::proxy_error(
+                            "Invalid JSON response from upstream".to_string(),
+                        ))
+                        .unwrap()
+                    });
+                return (StatusCode::OK, Json(value));
+            }
+            Err(e) => {
+                last_error = e.to_string();
+                if attempt < total_attempts - 1 {
+                    warn!(chain = %chain, endpoint = %endpoint_url, error = %e, attempt = attempt + 1, "Request failed, retrying");
+                } else {
+                    error!(chain = %chain, endpoint = %endpoint_url, error = %e, "All retry attempts exhausted");
+                }
+                chain_state.pool.record_failure(idx);
+                excluded.push(idx);
+            }
         }
     }
 
-    // Retry with a different endpoint
-    let (retry_idx, retry_endpoint) = match chain_state.pool.next_endpoint_excluding(idx) {
-        Some(ep) => ep,
-        None => {
-            chain_state.metrics.record_failures(request_count);
-            error!(chain = %chain, "No healthy endpoints available for retry");
-            let resp =
-                JsonRpcResponse::proxy_error("All endpoints failed or unhealthy".to_string());
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::to_value(resp).unwrap()),
-            );
-        }
-    };
-
-    let retry_url = retry_endpoint.to_string();
-    let retry_auth = chain_state.pool.endpoints[retry_idx].auth.as_ref();
-    match chain_state
-        .forwarder
-        .forward(&retry_url, body, retry_auth)
-        .await
-    {
-        Ok((_status, response_bytes, latency_ms)) => {
-            chain_state
-                .pool
-                .record_success_with_latency(retry_idx, latency_ms);
-            chain_state.metrics.record_successes(request_count);
-            let value: serde_json::Value =
-                serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
-                    serde_json::to_value(JsonRpcResponse::proxy_error(
-                        "Invalid JSON response from upstream".to_string(),
-                    ))
-                    .unwrap()
-                });
-            (StatusCode::OK, Json(value))
-        }
-        Err(e) => {
-            error!(chain = %chain, endpoint = %retry_url, error = %e, "Retry also failed");
-            chain_state.pool.record_failure(retry_idx);
-            chain_state.metrics.record_failures(request_count);
-            let resp = JsonRpcResponse::proxy_error(format!("All attempts failed: {}", e));
-            (
-                StatusCode::BAD_GATEWAY,
-                Json(serde_json::to_value(resp).unwrap()),
-            )
-        }
-    }
+    chain_state.metrics.record_failures(request_count);
+    let resp = JsonRpcResponse::proxy_error(format!("All attempts failed: {}", last_error));
+    (
+        StatusCode::BAD_GATEWAY,
+        Json(serde_json::to_value(resp).unwrap()),
+    )
 }

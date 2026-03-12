@@ -12,6 +12,7 @@ pub struct ChainPool {
     pub health: RwLock<Vec<EndpointHealth>>,
     pub health_config: HealthConfig,
     pub rotation: RotationStrategy,
+    pub chain_id: Option<u64>,
     /// Precomputed total weight for weighted rotation.
     total_weight: u32,
 }
@@ -33,6 +34,7 @@ impl ChainPool {
             health: RwLock::new(health_states),
             health_config: config.health.clone(),
             rotation: config.rotation.clone(),
+            chain_id: config.chain_id,
             total_weight,
         }
     }
@@ -50,6 +52,82 @@ impl ChainPool {
         match self.rotation {
             RotationStrategy::RoundRobin => self.next_round_robin_excluding(exclude),
             RotationStrategy::Weighted => self.next_weighted_excluding(exclude),
+        }
+    }
+
+    /// Select the next healthy endpoint excluding multiple indices.
+    pub fn next_endpoint_excluding_many(&self, exclude: &[usize]) -> Option<(usize, &str)> {
+        match self.rotation {
+            RotationStrategy::RoundRobin => {
+                let len = self.endpoints.len();
+                let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
+                let health = self.health.read().unwrap();
+                for i in 0..len {
+                    let idx = (start + i) % len;
+                    if exclude.contains(&idx) {
+                        continue;
+                    }
+                    if health[idx].is_healthy {
+                        return Some((idx, &self.endpoints[idx].url));
+                    }
+                }
+                // Fallback: least recently failed excluding all
+                let mut best: Option<usize> = None;
+                for i in 0..len {
+                    if exclude.contains(&i) {
+                        continue;
+                    }
+                    match best {
+                        None => best = Some(i),
+                        Some(prev) => {
+                            if health[i].failed_earlier_than(&health[prev]) {
+                                best = Some(i);
+                            }
+                        }
+                    }
+                }
+                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
+            }
+            RotationStrategy::Weighted => {
+                let health = self.health.read().unwrap();
+                let healthy_weight: u32 = self
+                    .endpoints
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| !exclude.contains(i) && health[*i].is_healthy)
+                    .map(|(_, e)| e.weight)
+                    .sum();
+                if healthy_weight == 0 {
+                    let mut best: Option<usize> = None;
+                    for i in 0..self.endpoints.len() {
+                        if exclude.contains(&i) {
+                            continue;
+                        }
+                        match best {
+                            None => best = Some(i),
+                            Some(prev) => {
+                                if health[i].failed_earlier_than(&health[prev]) {
+                                    best = Some(i);
+                                }
+                            }
+                        }
+                    }
+                    return best.map(|idx| (idx, self.endpoints[idx].url.as_str()));
+                }
+                let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
+                let target = tick % healthy_weight;
+                let mut cumulative = 0u32;
+                for (i, ep) in self.endpoints.iter().enumerate() {
+                    if exclude.contains(&i) || !health[i].is_healthy {
+                        continue;
+                    }
+                    cumulative += ep.weight;
+                    if target < cumulative {
+                        return Some((i, &ep.url));
+                    }
+                }
+                None
+            }
         }
     }
 

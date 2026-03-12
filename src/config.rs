@@ -25,6 +25,10 @@ pub struct ChainConfig {
     pub rotation: RotationStrategy,
     #[serde(default)]
     pub cache: Option<CacheConfig>,
+    #[serde(default)]
+    pub chain_id: Option<u64>,
+    #[serde(default)]
+    pub rate_limit: Option<RateLimitConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -90,6 +94,10 @@ pub struct HealthConfig {
     pub health_check_interval_seconds: u64,
     #[serde(default = "default_max_block_lag")]
     pub max_block_lag: u64,
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+    #[serde(default)]
+    pub retry_delay_ms: u64,
 }
 
 fn default_health_check_interval() -> u64 {
@@ -98,6 +106,10 @@ fn default_health_check_interval() -> u64 {
 
 fn default_max_block_lag() -> u64 {
     10
+}
+
+fn default_max_retries() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Deserialize, Default, PartialEq)]
@@ -124,6 +136,12 @@ pub struct CacheConfig {
 pub struct CacheMethodConfig {
     pub name: String,
     pub ttl_seconds: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RateLimitConfig {
+    pub max_requests: u32,
+    pub window_seconds: u64,
 }
 
 /// Default health check methods per chain family.
@@ -156,6 +174,16 @@ impl Config {
         if self.chains.is_empty() {
             return Err("At least one chain must be configured".into());
         }
+
+        let mut chain_ids = std::collections::HashSet::new();
+        for chain in &self.chains {
+            if let Some(id) = chain.chain_id {
+                if !chain_ids.insert(id) {
+                    return Err(format!("Duplicate chain_id {} in config", id).into());
+                }
+            }
+        }
+
         for chain in &self.chains {
             if chain.endpoints.is_empty() {
                 return Err(format!("Chain '{}' has no endpoints configured", chain.name).into());
@@ -171,6 +199,22 @@ impl Config {
                     chain.name
                 )
                 .into());
+            }
+            if let Some(ref rl) = chain.rate_limit {
+                if rl.max_requests == 0 {
+                    return Err(format!(
+                        "Chain '{}' rate_limit.max_requests must be > 0",
+                        chain.name
+                    )
+                    .into());
+                }
+                if rl.window_seconds == 0 {
+                    return Err(format!(
+                        "Chain '{}' rate_limit.window_seconds must be > 0",
+                        chain.name
+                    )
+                    .into());
+                }
             }
         }
         Ok(())

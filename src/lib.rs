@@ -8,7 +8,7 @@ pub mod types;
 
 use config::{
     CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointAuth, EndpointConfig,
-    HealthConfig, RotationStrategy, ServerConfig,
+    HealthConfig, RateLimitConfig, RotationStrategy, ServerConfig,
 };
 use proxy::build_router;
 use std::path::Path;
@@ -35,6 +35,11 @@ pub struct ChainBuilder {
     cache_preset: Option<String>,
     cache_max_capacity: Option<u64>,
     cache_methods: Vec<CacheMethodConfig>,
+    chain_id: Option<u64>,
+    max_retries: u32,
+    retry_delay_ms: u64,
+    rate_limit_max_requests: Option<u32>,
+    rate_limit_window_seconds: Option<u64>,
     parent: TurbineBuilder,
 }
 
@@ -97,6 +102,11 @@ impl TurbineBuilder {
             cache_preset: None,
             cache_max_capacity: None,
             cache_methods: Vec::new(),
+            chain_id: None,
+            max_retries: 1,
+            retry_delay_ms: 0,
+            rate_limit_max_requests: None,
+            rate_limit_window_seconds: None,
             parent: self,
         }
     }
@@ -248,6 +258,27 @@ impl ChainBuilder {
         self
     }
 
+    pub fn chain_id(mut self, id: u64) -> Self {
+        self.chain_id = Some(id);
+        self
+    }
+
+    pub fn max_retries(mut self, n: u32) -> Self {
+        self.max_retries = n;
+        self
+    }
+
+    pub fn retry_delay_ms(mut self, ms: u64) -> Self {
+        self.retry_delay_ms = ms;
+        self
+    }
+
+    pub fn rate_limit(mut self, max_requests: u32, window_seconds: u64) -> Self {
+        self.rate_limit_max_requests = Some(max_requests);
+        self.rate_limit_window_seconds = Some(window_seconds);
+        self
+    }
+
     /// Finish configuring this chain and return to the builder.
     pub fn done(self) -> TurbineBuilder {
         let cache = if self.cache_enabled {
@@ -261,6 +292,14 @@ impl ChainBuilder {
             None
         };
 
+        let rate_limit = match (self.rate_limit_max_requests, self.rate_limit_window_seconds) {
+            (Some(max_requests), Some(window_seconds)) => Some(RateLimitConfig {
+                max_requests,
+                window_seconds,
+            }),
+            _ => None,
+        };
+
         let chain = ChainConfig {
             name: self.name,
             route: self.route,
@@ -271,9 +310,13 @@ impl ChainBuilder {
                 health_method: self.health_method,
                 health_check_interval_seconds: self.health_check_interval_seconds,
                 max_block_lag: self.max_block_lag,
+                max_retries: self.max_retries,
+                retry_delay_ms: self.retry_delay_ms,
             },
             rotation: self.rotation,
             cache,
+            chain_id: self.chain_id,
+            rate_limit,
         };
         let mut parent = self.parent;
         parent.chains.push(chain);

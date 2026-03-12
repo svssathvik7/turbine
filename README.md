@@ -53,7 +53,9 @@ Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxie
 - **Round-robin & weighted rotation** — distribute requests evenly or by weight
 - **Passive health tracking** — automatically detects and skips failing endpoints
 - **Active health checks** — background block-height polling to detect stale nodes
-- **Auto-retry** — retries with a different endpoint on failure
+- **Configurable retries** — set max retries and delay per chain, with automatic endpoint exclusion
+- **Per-chain rate limiting** — configurable request quotas per time window
+- **Chain ID routing** — route by EVM chain ID (e.g., `/1`, `/8453`) in addition to path names
 - **Response caching** — per-method TTL cache with EVM/Solana presets
 - **Upstream authentication** — per-endpoint Basic Auth, Bearer tokens, or custom headers
 - **Live dashboard** — real-time web UI at `/dashboard` showing chain and endpoint performance
@@ -126,6 +128,7 @@ port = 8080
 [[chains]]
 name = "ethereum"
 route = "/ethereum"
+chain_id = 1                       # enables routing via POST /1
 rotation = "weighted"              # "round_robin" (default) or "weighted"
 endpoints = [
     "https://eth.llamarpc.com",    # simple URL (weight defaults to 1)
@@ -138,7 +141,13 @@ max_consecutive_failures = 3       # failures before marking unhealthy (default:
 cooldown_seconds = 30              # seconds before retrying unhealthy endpoint (default: 30)
 health_check_interval_seconds = 30 # how often to poll block height (default: 30)
 max_block_lag = 10                 # max blocks behind before marking stale (default: 10)
+max_retries = 2                    # retry up to 2 times on failure (default: 1)
+retry_delay_ms = 100               # wait 100ms between retries (default: 0)
 # health_method = "eth_blockNumber"  # auto-detected for known chains
+
+[chains.rate_limit]
+max_requests = 100                 # max requests per window
+window_seconds = 60                # time window in seconds
 
 [chains.cache]
 enabled = true
@@ -200,6 +209,7 @@ preset = "solana"
 |-------|------|---------|-------------|
 | `name` | string | required | Chain identifier (used in logs and dashboard) |
 | `route` | string | required | HTTP path prefix (e.g., `/ethereum`) |
+| `chain_id` | integer | none | EVM chain ID for numeric routing (e.g., `1` for Ethereum) |
 | `rotation` | string | `"round_robin"` | `"round_robin"` or `"weighted"` |
 | `endpoints` | array | required | List of RPC endpoint URLs or objects |
 
@@ -222,6 +232,8 @@ preset = "solana"
 | `health_check_interval_seconds` | integer | `30` | Seconds between background health checks |
 | `max_block_lag` | integer | `10` | Max blocks an endpoint can lag behind before being marked stale |
 | `health_method` | string | auto-detected | JSON-RPC method for health checks |
+| `max_retries` | integer | `1` | Max retries on failure (total attempts = max_retries + 1) |
+| `retry_delay_ms` | integer | `0` | Milliseconds to wait between retries |
 
 **Auto-detected health methods:** The health check method is automatically chosen based on chain name:
 
@@ -231,6 +243,15 @@ preset = "solana"
 | `solana` | `getSlot` |
 | `starknet` | `starknet_blockNumber` |
 | Everything else (EVM) | `eth_blockNumber` |
+
+#### `[chains.rate_limit]`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_requests` | integer | required | Maximum requests allowed per window |
+| `window_seconds` | integer | required | Time window in seconds |
+
+Rate limiting is optional per-chain. When configured, requests exceeding the limit receive HTTP 429.
 
 #### `[chains.cache]`
 
@@ -361,6 +382,11 @@ curl http://localhost:8080/metrics
 # Detailed status with per-endpoint data
 curl http://localhost:8080/api/status
 
+# Route by chain ID (if chain_id = 1 configured for ethereum)
+curl -X POST http://localhost:8080/1 \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
 # Open dashboard in browser
 open http://localhost:8080/dashboard
 ```
@@ -388,6 +414,10 @@ Turbine::builder()
         .cache_preset("evm")                        // load preset TTLs
         .cache_max_capacity(10000)                  // max cache entries
         .cache_method("eth_blockNumber", 5)         // custom method TTL
+        .chain_id(1)                                // EVM chain ID for /{id} routing
+        .rate_limit(100, 60)                        // 100 requests per 60 seconds
+        .max_retries(2)                             // retry up to 2 times on failure
+        .retry_delay_ms(100)                        // 100ms between retries
         .done()                                     // finish chain, return to builder
     .build()                                        // build Turbine instance
 ```
