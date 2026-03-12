@@ -1,6 +1,6 @@
 use super::state::EndpointStatus;
 use super::EndpointHealth;
-use crate::config::{ChainConfig, EndpointConfig, HealthConfig, RotationStrategy};
+use crate::config::{ChainConfig, EndpointConfig, HealthConfig, HedgeConfig, RotationStrategy};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::RwLock;
 
@@ -13,6 +13,7 @@ pub struct ChainPool {
     pub health_config: HealthConfig,
     pub rotation: RotationStrategy,
     pub chain_id: Option<u64>,
+    pub hedge_config: Option<HedgeConfig>,
     /// Precomputed total weight for weighted rotation.
     total_weight: u32,
 }
@@ -35,6 +36,7 @@ impl ChainPool {
             health_config: config.health.clone(),
             rotation: config.rotation.clone(),
             chain_id: config.chain_id,
+            hedge_config: config.hedge.clone(),
             total_weight,
         }
     }

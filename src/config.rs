@@ -29,6 +29,8 @@ pub struct ChainConfig {
     pub chain_id: Option<u64>,
     #[serde(default)]
     pub rate_limit: Option<RateLimitConfig>,
+    #[serde(default)]
+    pub hedge: Option<HedgeConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -144,6 +146,17 @@ pub struct RateLimitConfig {
     pub window_seconds: u64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct HedgeConfig {
+    pub delay_ms: u64,
+    #[serde(default = "default_hedge_max_count")]
+    pub max_count: u32,
+}
+
+fn default_hedge_max_count() -> u32 {
+    1
+}
+
 /// Default health check methods per chain family.
 pub fn default_health_method(chain_name: &str) -> &'static str {
     let name = chain_name.to_lowercase();
@@ -199,6 +212,23 @@ impl Config {
                     chain.name
                 )
                 .into());
+            }
+            if let Some(ref hedge) = chain.hedge {
+                if hedge.delay_ms == 0 {
+                    return Err(format!("Chain '{}' hedge.delay_ms must be > 0", chain.name).into());
+                }
+                if hedge.max_count == 0 {
+                    return Err(
+                        format!("Chain '{}' hedge.max_count must be > 0", chain.name).into(),
+                    );
+                }
+                if chain.endpoints.len() < 2 {
+                    return Err(format!(
+                        "Chain '{}' uses hedging but has fewer than 2 endpoints",
+                        chain.name
+                    )
+                    .into());
+                }
             }
             if let Some(ref rl) = chain.rate_limit {
                 if rl.max_requests == 0 {

@@ -1,0 +1,279 @@
+# Turbine deployment config — multi-chain production example
+# Mount to /etc/turbine/config.toml in Docker
+#
+# Replace placeholder URLs with your actual RPC endpoints.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+# ─── Ethereum Mainnet (chainId: 1) ───
+# Weighted rotation: primary provider gets 100x traffic vs others
+[[chains]]
+name = "ethereum"
+route = "/ethereum"
+chain_id = 1
+rotation = "weighted"
+endpoints = [
+    { url = "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY_1", weight = 100 },
+    { url = "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY_2", weight = 1 },
+    { url = "https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY_3", weight = 1 },
+    { url = "https://rpc.ankr.com/eth/YOUR_ANKR_KEY", weight = 1 },
+    { url = "https://lb.drpc.live/ethereum/YOUR_DRPC_KEY", weight = 1 },
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 50
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 500
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Base Mainnet (chainId: 8453) ───
+[[chains]]
+name = "base"
+route = "/base"
+chain_id = 8453
+endpoints = [
+    "https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY_1",
+    "https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY_2",
+    "https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY_3",
+    "https://rpc.ankr.com/base/YOUR_ANKR_KEY",
+    "https://lb.drpc.live/base/YOUR_DRPC_KEY",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 50
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 500
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Arbitrum One (chainId: 42161) ───
+[[chains]]
+name = "arbitrum"
+route = "/arbitrum"
+chain_id = 42161
+endpoints = [
+    "https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY_1",
+    "https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY_2",
+    "https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY_3",
+    "https://lb.drpc.live/arbitrum/YOUR_DRPC_KEY",
+    "https://rpc.ankr.com/arbitrum/YOUR_ANKR_KEY",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 50
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 500
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Alpen Testnet (chainId: 8150) ───
+[[chains]]
+name = "alpen_testnet"
+route = "/alpen-testnet"
+chain_id = 8150
+endpoints = [
+    "https://rpc.testnet.alpenlabs.io",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 2
+retry_delay_ms = 200
+
+[chains.rate_limit]
+max_requests = 10
+window_seconds = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── HyperEVM Testnet (chainId: 998) ───
+[[chains]]
+name = "hyperevm_testnet"
+route = "/hyperevm-testnet"
+chain_id = 998
+endpoints = [
+    "https://rpc.hyperliquid-testnet.xyz/evm",
+    "https://rpcs.chain.link/hyperevm/testnet",
+    "https://api.hyperliquid-testnet.xyz/evm",
+    "https://spectrum-01.simplystaking.xyz/hyperliquid-tn-rpc/evm",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 2
+retry_delay_ms = 200
+
+[chains.rate_limit]
+max_requests = 40
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 500
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Citrea Testnet (chainId: 5115) ───
+[[chains]]
+name = "citrea_testnet"
+route = "/citrea-testnet"
+chain_id = 5115
+endpoints = [
+    "https://rpc.testnet.citrea.xyz",
+    "https://citrea-testnet.g.alchemy.com/v2/YOUR_API_KEY_1",
+    "https://citrea-testnet.g.alchemy.com/v2/YOUR_API_KEY_2",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 30
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 500
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Monad Testnet (chainId: 10143) ───
+[[chains]]
+name = "monad_testnet"
+route = "/monad-testnet"
+chain_id = 10143
+endpoints = [
+    "https://monad-testnet.g.alchemy.com/v2/YOUR_API_KEY",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 10
+window_seconds = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Base Sepolia (chainId: 84532) ───
+[[chains]]
+name = "base_sepolia"
+route = "/base-sepolia"
+chain_id = 84532
+endpoints = [
+    "https://base-sepolia.g.alchemy.com/v2/YOUR_API_KEY",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 10
+window_seconds = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── BNB Testnet (chainId: 97) ───
+[[chains]]
+name = "bnb_testnet"
+route = "/bnb-testnet"
+chain_id = 97
+endpoints = [
+    "https://bnb-testnet.api.onfinality.io/public",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 10
+window_seconds = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Skipped networks (no explicit upstreams in eRPC config) ───
+# These relied on eRPC's "repository" provider for auto-discovered public RPCs.
+# To add them in Turbine, provide explicit endpoint URLs:
+#   unichain (130), core (1116), bnb (56), corn (21000000),
+#   bera (80094), botanix (3637), ethereum_sepolia (11155111),
+#   arbitrum_sepolia (421614)

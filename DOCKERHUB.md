@@ -30,6 +30,10 @@ cooldown_seconds = 30
 health_check_interval_seconds = 30
 max_block_lag = 10
 
+[chains.hedge]
+delay_ms = 500
+max_count = 1
+
 [chains.cache]
 enabled = true
 preset = "evm"
@@ -63,6 +67,7 @@ Visit [http://localhost:8080/dashboard](http://localhost:8080/dashboard) for a l
 - **Round-robin & weighted rotation** — distribute requests evenly or by weight
 - **Passive health tracking** — automatically detects and skips failing endpoints
 - **Active health checks** — background block-height polling to detect stale nodes
+- **Hedged requests** — fire parallel requests after a configurable delay to reduce tail latency
 - **Auto-retry** — on failure, retries with a different healthy endpoint
 - **Response caching** — per-method TTL cache with EVM and Solana presets
 - **Upstream authentication** — per-endpoint Basic Auth, Bearer tokens, or custom headers
@@ -164,8 +169,8 @@ docker run -v $(pwd)/config.toml:/etc/turbine/config.toml -p 9090:9090 \
 
 | Architecture | Tag |
 |--------------|-----|
-| `linux/amd64` | `latest`, `0.3.0` |
-| `linux/arm64` | `latest`, `0.3.0` |
+| `linux/amd64` | `latest`, `0.5.0` |
+| `linux/arm64` | `latest`, `0.5.0` |
 
 ## Configuration Reference
 
