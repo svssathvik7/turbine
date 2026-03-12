@@ -199,15 +199,40 @@ pub const DASHBOARD_HTML: &str = r##"<!DOCTYPE html>
   .dot-healthy { background: var(--green); }
   .dot-unhealthy { background: var(--red); }
   .url-cell {
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: monospace;
-    font-size: 12px;
     display: flex;
     align-items: center;
+    gap: 4px;
   }
+  .url-chip {
+    font-family: monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(88,166,255,0.1);
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .url-chip:hover { background: rgba(88,166,255,0.2); }
+  .copy-tooltip {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--green);
+    color: #000;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .copy-tooltip.show { opacity: 1; }
   .latency-good { color: var(--green); }
   .latency-ok { color: var(--yellow); }
   .latency-bad { color: var(--red); }
@@ -300,19 +325,27 @@ function chainHealth(c) {
   return 'degraded';
 }
 
-function truncUrl(url) {
+function shortLabel(url) {
   try {
     const u = new URL(url);
-    let display = u.hostname;
-    if (u.pathname && u.pathname !== '/') {
-      const p = u.pathname.length > 20 ? u.pathname.slice(0, 20) + '...' : u.pathname;
-      display += p;
-    }
-    if (url.includes('?...')) display += '?...';
-    return display;
+    const parts = u.hostname.replace(/^www\./, '').split('.');
+    const name = parts[0].length > 5 ? parts[0].slice(0, 5) : parts[0];
+    return name;
   } catch {
-    return url.length > 40 ? url.slice(0, 40) + '...' : url;
+    return url.slice(0, 5);
   }
+}
+
+function formatBlockHeight(n) {
+  if (n === null || n === undefined) return '--';
+  return n.toLocaleString();
+}
+
+function copyUrl(el, url) {
+  navigator.clipboard.writeText(url);
+  const tip = el.querySelector('.copy-tooltip');
+  tip.classList.add('show');
+  setTimeout(() => tip.classList.remove('show'), 1200);
 }
 
 function render(data) {
@@ -389,15 +422,13 @@ function render(data) {
         ? Math.round(ep.rolling_latency_ms) + 'ms'
         : '--';
       const lClass = latencyClass(ep.rolling_latency_ms);
-      const block = ep.block_height !== null && ep.block_height !== undefined
-        ? formatNum(ep.block_height)
-        : '--';
+      const block = formatBlockHeight(ep.block_height);
       const epSuccessRate = ep.request_count > 0
         ? pct(ep.success_count, ep.request_count) + '%'
         : '--';
 
       endpointsHtml += `<tr>
-        <td><div class="url-cell"><span class="status-dot ${dot}"></span><span title="${ep.url}">${truncUrl(ep.url)}</span></div></td>
+        <td><div class="url-cell"><span class="status-dot ${dot}"></span><span class="url-chip" onclick="copyUrl(this, '${ep.url.replace(/'/g, "\\'")}')" title="${ep.url}">${shortLabel(ep.url)}<span class="copy-tooltip">Copied!</span></span></div></td>
         <td class="${lClass}">${latency}</td>
         <td>${block}</td>
         <td style="text-align:center">${ep.weight}</td>

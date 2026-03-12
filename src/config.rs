@@ -13,6 +13,8 @@ pub struct Config {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
+    #[serde(default)]
+    pub dashboard_secret: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

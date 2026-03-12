@@ -1,6 +1,7 @@
 [server]
 host = "127.0.0.1"
 port = 8080
+# dashboard_secret = "my-secret-path"  # dashboard at /{secret}, disabled if omitted
 
 # Round-robin (default) with simple string endpoints
 [[chains]]
