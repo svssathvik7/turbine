@@ -70,8 +70,8 @@ pub fn build_router(config: &Config) -> Router {
 async fn metrics_handler(State(state): State<Arc<AppState>>) -> Json<Vec<ChainMetricsSnapshot>> {
     let snapshots: Vec<ChainMetricsSnapshot> = state
         .chains
-        .iter()
-        .map(|(_, chain_state)| {
+        .values()
+        .map(|chain_state| {
             chain_state.metrics.snapshot(
                 &chain_state.pool.name,
                 chain_state.pool.healthy_count(),

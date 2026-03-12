@@ -6,6 +6,12 @@ pub struct Forwarder {
     client: Client,
 }
 
+impl Default for Forwarder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Forwarder {
     pub fn new() -> Self {
         let client = Client::builder()

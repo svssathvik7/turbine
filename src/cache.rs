@@ -67,7 +67,7 @@ impl CachePreset {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "evm" => CachePreset::Evm,
             "solana" => CachePreset::Solana,
@@ -136,7 +136,7 @@ impl ChainCache {
     /// - Applies user overrides from `config.methods`
     pub fn new(config: &CacheConfig, chain_name: &str) -> Self {
         let preset = match &config.preset {
-            Some(p) => CachePreset::from_str(p),
+            Some(p) => CachePreset::parse(p),
             None => CachePreset::from_chain_name(chain_name),
         };
 

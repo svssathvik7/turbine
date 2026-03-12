@@ -10,6 +10,12 @@ pub struct ChainMetrics {
     pub cache_misses: AtomicU64,
 }
 
+impl Default for ChainMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChainMetrics {
     pub fn new() -> Self {
         Self {
