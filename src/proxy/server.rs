@@ -79,6 +79,7 @@ pub fn build_router(config: &Config) -> Router {
     });
 
     let mut router = Router::new()
+        .route("/", get(health_handler))
         .route("/metrics", get(metrics_handler))
         .route("/api/status", get(status_handler));
 
@@ -173,6 +174,49 @@ async fn status_handler(State(state): State<Arc<AppState>>) -> Json<StatusRespon
         uptime_seconds,
         chains,
     })
+}
+
+#[derive(Serialize)]
+struct HealthResponse {
+    rpc: Vec<ChainHealthEntry>,
+}
+
+#[derive(Serialize)]
+struct ChainHealthEntry {
+    id: String,
+    alias: String,
+    state: &'static str,
+}
+
+async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthResponse> {
+    let mut rpc: Vec<ChainHealthEntry> = state
+        .chains
+        .values()
+        .map(|chain_state| {
+            let id = match chain_state.pool.chain_id {
+                Some(cid) => format!("evm:{}", cid),
+                None => chain_state.pool.name.clone(),
+            };
+            let healthy = chain_state.pool.healthy_count();
+            let total = chain_state.pool.endpoints.len();
+            let state_str = if healthy == total {
+                "OK"
+            } else if healthy > 0 {
+                "DEGRADED"
+            } else {
+                "DOWN"
+            };
+            ChainHealthEntry {
+                id,
+                alias: chain_state.pool.name.clone(),
+                state: state_str,
+            }
+        })
+        .collect();
+
+    rpc.sort_by(|a, b| a.alias.cmp(&b.alias));
+
+    Json(HealthResponse { rpc })
 }
 
 async fn dashboard_handler() -> Html<&'static str> {
