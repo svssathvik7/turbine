@@ -90,7 +90,8 @@ async fn fetch_block_heights(
 
     for (idx, endpoint) in pool.endpoints.iter().enumerate() {
         let start = std::time::Instant::now();
-        let height = fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
+        let height =
+            fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
         let latency_ms = start.elapsed().as_millis() as u64;
         if height.is_some() {
             pool.update_latency(idx, latency_ms);
@@ -101,7 +102,12 @@ async fn fetch_block_heights(
     results
 }
 
-async fn fetch_block_height(client: &Client, endpoint: &str, method: &str, auth: Option<&EndpointAuth>) -> Option<u64> {
+async fn fetch_block_height(
+    client: &Client,
+    endpoint: &str,
+    method: &str,
+    auth: Option<&EndpointAuth>,
+) -> Option<u64> {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "method": method,

@@ -70,7 +70,11 @@ impl<'de> Deserialize<'de> for EndpointConfig {
     {
         let raw = EndpointRaw::deserialize(deserializer).map_err(de::Error::custom)?;
         Ok(match raw {
-            EndpointRaw::Simple(url) => EndpointConfig { url, weight: default_weight(), auth: None },
+            EndpointRaw::Simple(url) => EndpointConfig {
+                url,
+                weight: default_weight(),
+                auth: None,
+            },
             EndpointRaw::Full { url, weight, auth } => EndpointConfig { url, weight, auth },
         })
     }
@@ -157,17 +161,16 @@ impl Config {
                 return Err(format!("Chain '{}' has no endpoints configured", chain.name).into());
             }
             if !chain.route.starts_with('/') {
-                return Err(
-                    format!("Chain '{}' route must start with '/'", chain.name).into(),
-                );
+                return Err(format!("Chain '{}' route must start with '/'", chain.name).into());
             }
             if chain.rotation == RotationStrategy::Weighted
                 && chain.endpoints.iter().all(|e| e.weight == 0)
             {
-                return Err(
-                    format!("Chain '{}' uses weighted rotation but all weights are 0", chain.name)
-                        .into(),
-                );
+                return Err(format!(
+                    "Chain '{}' uses weighted rotation but all weights are 0",
+                    chain.name
+                )
+                .into());
             }
         }
         Ok(())

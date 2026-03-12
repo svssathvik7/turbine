@@ -67,9 +67,7 @@ pub fn build_router(config: &Config) -> Router {
         .with_state(state)
 }
 
-async fn metrics_handler(
-    State(state): State<Arc<AppState>>,
-) -> Json<Vec<ChainMetricsSnapshot>> {
+async fn metrics_handler(State(state): State<Arc<AppState>>) -> Json<Vec<ChainMetricsSnapshot>> {
     let snapshots: Vec<ChainMetricsSnapshot> = state
         .chains
         .iter()
@@ -106,9 +104,7 @@ struct ChainStatusSnapshot {
     endpoints: Vec<EndpointStatus>,
 }
 
-async fn status_handler(
-    State(state): State<Arc<AppState>>,
-) -> Json<StatusResponse> {
+async fn status_handler(State(state): State<Arc<AppState>>) -> Json<StatusResponse> {
     let uptime_seconds = state.started_at.elapsed().as_secs();
 
     let mut chains: Vec<ChainStatusSnapshot> = state

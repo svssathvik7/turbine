@@ -83,10 +83,7 @@ impl CachePreset {
             CachePreset::Evm => {
                 map.insert("eth_chainId".to_string(), Duration::from_secs(86400));
                 map.insert("net_version".to_string(), Duration::from_secs(86400));
-                map.insert(
-                    "eth_getBlockByNumber".to_string(),
-                    Duration::from_secs(300),
-                );
+                map.insert("eth_getBlockByNumber".to_string(), Duration::from_secs(300));
                 map.insert("eth_getBlockByHash".to_string(), Duration::from_secs(300));
                 map.insert(
                     "eth_getTransactionByHash".to_string(),

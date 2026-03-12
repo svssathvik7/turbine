@@ -80,8 +80,8 @@ pub async fn proxy_handler(
                         chain_state.metrics.record_cache_hit();
                         chain_state.metrics.record_successes(1);
                         debug!(chain = %chain, method = %rpc_req.method, "Cache hit");
-                        let value: serde_json::Value =
-                            serde_json::from_slice(&cached.body).unwrap_or_else(|_| {
+                        let value: serde_json::Value = serde_json::from_slice(&cached.body)
+                            .unwrap_or_else(|_| {
                                 serde_json::to_value(JsonRpcResponse::proxy_error(
                                     "Invalid cached response".to_string(),
                                 ))
@@ -136,8 +136,7 @@ async fn handle_batch_with_cache(
 
     // For each item in batch, try cache lookup
     // We store (original_index, rpc_request, Option<cached_response>)
-    let mut results: Vec<(usize, Option<serde_json::Value>)> =
-        vec![(0, None); batch.len()];
+    let mut results: Vec<(usize, Option<serde_json::Value>)> = vec![(0, None); batch.len()];
     let mut uncached_indices: Vec<usize> = Vec::new();
     let mut uncached_requests: Vec<serde_json::Value> = Vec::new();
     // Track cache keys for uncached items so we can store responses later
@@ -175,13 +174,9 @@ async fn handle_batch_with_cache(
 
     // If all items were cached, return immediately
     if uncached_requests.is_empty() {
-        let all_results: Vec<serde_json::Value> = results
-            .into_iter()
-            .map(|(_, v)| v.unwrap())
-            .collect();
-        chain_state
-            .metrics
-            .record_successes(batch.len() as u64);
+        let all_results: Vec<serde_json::Value> =
+            results.into_iter().map(|(_, v)| v.unwrap()).collect();
+        chain_state.metrics.record_successes(batch.len() as u64);
         return (StatusCode::OK, Json(serde_json::Value::Array(all_results)));
     }
 
@@ -277,9 +272,15 @@ async fn forward_with_retry(
 
     let endpoint_url = endpoint.to_string();
     let auth = chain_state.pool.endpoints[idx].auth.as_ref();
-    match chain_state.forwarder.forward(&endpoint_url, body, auth).await {
+    match chain_state
+        .forwarder
+        .forward(&endpoint_url, body, auth)
+        .await
+    {
         Ok((_status, response_bytes, latency_ms)) => {
-            chain_state.pool.record_success_with_latency(idx, latency_ms);
+            chain_state
+                .pool
+                .record_success_with_latency(idx, latency_ms);
             chain_state.metrics.record_successes(request_count);
             let value: serde_json::Value =
                 serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
@@ -313,9 +314,15 @@ async fn forward_with_retry(
 
     let retry_url = retry_endpoint.to_string();
     let retry_auth = chain_state.pool.endpoints[retry_idx].auth.as_ref();
-    match chain_state.forwarder.forward(&retry_url, body, retry_auth).await {
+    match chain_state
+        .forwarder
+        .forward(&retry_url, body, retry_auth)
+        .await
+    {
         Ok((_status, response_bytes, latency_ms)) => {
-            chain_state.pool.record_success_with_latency(retry_idx, latency_ms);
+            chain_state
+                .pool
+                .record_success_with_latency(retry_idx, latency_ms);
             chain_state.metrics.record_successes(request_count);
             let value: serde_json::Value =
                 serde_json::from_slice(&response_bytes).unwrap_or_else(|_| {
