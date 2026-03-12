@@ -1,3 +1,9 @@
+[![CI](https://github.com/svssathvik7/turbine/actions/workflows/ci.yml/badge.svg)](https://github.com/svssathvik7/turbine/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/turbine-rpc-proxy)](https://crates.io/crates/turbine-rpc-proxy)
+[![Docker Pulls](https://img.shields.io/docker/pulls/svssathvik7/turbine)](https://hub.docker.com/r/svssathvik7/turbine)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/svssathvik7/turbine)](https://github.com/svssathvik7/turbine)
+
 # Turbine
 
 Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxies, Turbine works with any blockchain that speaks JSON-RPC over HTTP.

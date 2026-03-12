@@ -1,0 +1,15 @@
+# Turbine - Multi-chain RPC Proxy
+#
+# Usage:
+#   1. Place your config.toml alongside this file
+#   2. docker compose up -d
+#   3. Open http://localhost:8080/dashboard
+
+services:
+  turbine:
+    image: svssathvik7/turbine:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.toml:/etc/turbine/config.toml:ro
+    restart: unless-stopped

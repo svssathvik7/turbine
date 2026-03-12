@@ -7,6 +7,8 @@ license = "MIT"
 repository = "https://github.com/svssathvik7/turbine"
 keywords = ["rpc", "proxy", "blockchain", "multi-chain", "load-balancer"]
 categories = ["network-programming", "web-programming"]
+readme = "README.md"
+documentation = "https://docs.rs/turbine-rpc-proxy"
 
 [lib]
 name = "turbine"

@@ -1,0 +1,81 @@
+# Example: Multi-chain configuration with all supported chain families
+#
+# This config demonstrates Ethereum, Bitcoin, Solana, and Starknet
+# running behind a single Turbine instance.
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+# ─── Ethereum (round-robin + EVM caching) ───
+[[chains]]
+name = "ethereum"
+route = "/ethereum"
+endpoints = [
+    "https://eth.llamarpc.com",
+    "https://rpc.ankr.com/eth",
+    "https://ethereum-rpc.publicnode.com",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 30
+max_block_lag = 10
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+[[chains.cache.methods]]
+name = "eth_blockNumber"
+ttl_seconds = 5
+
+# ─── Bitcoin (Basic Auth) ───
+[[chains]]
+name = "bitcoin"
+route = "/bitcoin"
+endpoints = [
+    { url = "http://localhost:8332", auth = { basic = { username = "rpcuser", password = "rpcpass" } } },
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_method = "getblockcount"
+
+# ─── Solana (weighted rotation + Solana caching) ───
+[[chains]]
+name = "solana"
+route = "/solana"
+rotation = "weighted"
+endpoints = [
+    { url = "https://api.mainnet-beta.solana.com", weight = 3 },
+    { url = "https://rpc.ankr.com/solana", weight = 1 },
+]
+
+[chains.health]
+max_consecutive_failures = 5
+cooldown_seconds = 60
+health_method = "getSlot"
+health_check_interval_seconds = 15
+max_block_lag = 50
+
+[chains.cache]
+enabled = true
+preset = "solana"
+
+# ─── Starknet ───
+[[chains]]
+name = "starknet"
+route = "/starknet"
+endpoints = [
+    "https://starknet-mainnet.public.blastapi.io",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_method = "starknet_blockNumber"
+health_check_interval_seconds = 30
+max_block_lag = 10
