@@ -78,10 +78,19 @@ pub fn build_router(config: &Config) -> Router {
         started_at: std::time::Instant::now(),
     });
 
-    Router::new()
+    let mut router = Router::new()
         .route("/metrics", get(metrics_handler))
-        .route("/api/status", get(status_handler))
-        .route("/dashboard", get(dashboard_handler))
+        .route("/api/status", get(status_handler));
+
+    if let Some(ref secret) = config.server.dashboard_secret {
+        let path = format!("/{}", secret);
+        info!(path = %path, "Dashboard enabled at secret path");
+        router = router.route(&path, get(dashboard_handler));
+    } else {
+        info!("Dashboard disabled (no dashboard_secret configured)");
+    }
+
+    router
         .route("/{chain}", post(proxy_handler))
         .with_state(state)
 }

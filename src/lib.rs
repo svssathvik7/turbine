@@ -19,6 +19,7 @@ pub struct Turbine {
 
 pub struct TurbineBuilder {
     chains: Vec<ChainConfig>,
+    dashboard_secret: Option<String>,
 }
 
 pub struct ChainBuilder {
@@ -59,7 +60,10 @@ impl Turbine {
 
     /// Start building a Turbine instance programmatically.
     pub fn builder() -> TurbineBuilder {
-        TurbineBuilder { chains: Vec::new() }
+        TurbineBuilder {
+            chains: Vec::new(),
+            dashboard_secret: None,
+        }
     }
 
     /// Get the configured host.
@@ -115,6 +119,12 @@ impl TurbineBuilder {
         }
     }
 
+    /// Set a secret path for the dashboard (e.g., `"my-secret"` → `/{my-secret}`).
+    pub fn dashboard_secret(mut self, secret: &str) -> Self {
+        self.dashboard_secret = Some(secret.to_string());
+        self
+    }
+
     /// Build the Turbine instance.
     pub fn build(self) -> Result<Turbine, Box<dyn std::error::Error>> {
         if self.chains.is_empty() {
@@ -124,6 +134,7 @@ impl TurbineBuilder {
             server: ServerConfig {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
+                dashboard_secret: self.dashboard_secret,
             },
             chains: self.chains,
         };

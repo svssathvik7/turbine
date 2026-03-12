@@ -6,6 +6,7 @@
 [server]
 host = "0.0.0.0"
 port = 8080
+dashboard_secret = "turbine-dashboard"  # dashboard at /turbine-dashboard
 
 # ─── Ethereum (round-robin + EVM caching + rate limiting + hedging) ───
 [[chains]]
