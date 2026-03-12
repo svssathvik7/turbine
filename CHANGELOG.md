@@ -2,6 +2,17 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] - 2026-03-12
+
+### Added
+
+- Per-chain rate limiting with configurable `max_requests` and `window_seconds`
+- Chain ID routing: numeric paths like `/1` or `/8453` resolve to chains by `chain_id`
+- Configurable retries: `max_retries` and `retry_delay_ms` in `[chains.health]`
+- Builder API methods: `.chain_id()`, `.rate_limit()`, `.max_retries()`, `.retry_delay_ms()`
+- Rate-limited request counter in metrics and status API
+- `chain_id` field in status API response
+
 ## [0.3.0] - 2026-03-10
 
 ### Added

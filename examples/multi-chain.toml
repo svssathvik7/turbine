@@ -7,10 +7,11 @@
 host = "0.0.0.0"
 port = 8080
 
-# ─── Ethereum (round-robin + EVM caching) ───
+# ─── Ethereum (round-robin + EVM caching + rate limiting) ───
 [[chains]]
 name = "ethereum"
 route = "/ethereum"
+chain_id = 1                  # enables routing via POST /1
 endpoints = [
     "https://eth.llamarpc.com",
     "https://rpc.ankr.com/eth",
@@ -22,6 +23,12 @@ max_consecutive_failures = 3
 cooldown_seconds = 30
 health_check_interval_seconds = 30
 max_block_lag = 10
+max_retries = 2
+retry_delay_ms = 100
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 60
 
 [chains.cache]
 enabled = true
@@ -48,6 +55,7 @@ health_method = "getblockcount"
 [[chains]]
 name = "solana"
 route = "/solana"
+chain_id = 1399811149         # Solana's chain ID
 rotation = "weighted"
 endpoints = [
     { url = "https://api.mainnet-beta.solana.com", weight = 3 },

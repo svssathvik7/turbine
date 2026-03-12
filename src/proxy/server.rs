@@ -8,13 +8,17 @@ use axum::extract::State;
 use axum::response::{Html, Json};
 use axum::routing::{get, post};
 use axum::Router;
+use governor::{Quota, RateLimiter};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::num::NonZeroU32;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::info;
 
 pub fn build_router(config: &Config) -> Router {
     let mut chains = HashMap::new();
+    let mut chain_id_map = HashMap::new();
 
     for chain_config in &config.chains {
         let route = chain_config.route.trim_start_matches('/').to_string();
@@ -38,11 +42,25 @@ pub fn build_router(config: &Config) -> Router {
             _ => None,
         };
 
+        let rate_limiter = chain_config.rate_limit.as_ref().map(|rl| {
+            let period = Duration::from_secs(rl.window_seconds) / rl.max_requests;
+            let quota = Quota::with_period(period)
+                .unwrap()
+                .allow_burst(NonZeroU32::new(rl.max_requests).unwrap());
+            Arc::new(RateLimiter::direct(quota))
+        });
+
+        if let Some(chain_id) = chain_config.chain_id {
+            chain_id_map.insert(chain_id, route.clone());
+            info!(chain = %chain_config.name, chain_id = chain_id, "Registered chain ID route");
+        }
+
         let chain_state = ChainState {
             pool,
             metrics: ChainMetrics::new(),
             forwarder: Forwarder::new(),
             cache,
+            rate_limiter,
         };
         info!(
             chain = %chain_config.name,
@@ -56,6 +74,7 @@ pub fn build_router(config: &Config) -> Router {
 
     let state = Arc::new(AppState {
         chains,
+        chain_id_map,
         started_at: std::time::Instant::now(),
     });
 
@@ -94,11 +113,13 @@ struct ChainStatusSnapshot {
     name: String,
     route: String,
     rotation: String,
+    chain_id: Option<u64>,
     total_requests: u64,
     successful_requests: u64,
     failed_requests: u64,
     cache_hits: u64,
     cache_misses: u64,
+    rate_limited_requests: u64,
     active_endpoints: usize,
     total_endpoints: usize,
     endpoints: Vec<EndpointStatus>,
@@ -121,11 +142,13 @@ async fn status_handler(State(state): State<Arc<AppState>>) -> Json<StatusRespon
                 name: chain_state.pool.name.clone(),
                 route: format!("/{}", route),
                 rotation: chain_state.pool.rotation_name().to_string(),
+                chain_id: chain_state.pool.chain_id,
                 total_requests: metrics.total_requests,
                 successful_requests: metrics.successful_requests,
                 failed_requests: metrics.failed_requests,
                 cache_hits: metrics.cache_hits,
                 cache_misses: metrics.cache_misses,
+                rate_limited_requests: metrics.rate_limited_requests,
                 active_endpoints: metrics.active_endpoints,
                 total_endpoints: metrics.total_endpoints,
                 endpoints: chain_state.pool.endpoint_statuses(),
