@@ -10,6 +10,12 @@ pub struct ChainMetrics {
     pub cache_misses: AtomicU64,
 }
 
+impl Default for ChainMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChainMetrics {
     pub fn new() -> Self {
         Self {
@@ -41,7 +47,12 @@ impl ChainMetrics {
         self.cache_misses.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn snapshot(&self, name: &str, active_endpoints: usize, total_endpoints: usize) -> ChainMetricsSnapshot {
+    pub fn snapshot(
+        &self,
+        name: &str,
+        active_endpoints: usize,
+        total_endpoints: usize,
+    ) -> ChainMetricsSnapshot {
         ChainMetricsSnapshot {
             chain: name.to_string(),
             total_requests: self.total_requests.load(Ordering::Relaxed),

@@ -28,6 +28,12 @@ pub struct EndpointStatus {
     pub failure_count: u64,
 }
 
+impl Default for EndpointHealth {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EndpointHealth {
     pub fn new() -> Self {
         Self {

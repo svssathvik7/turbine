@@ -120,13 +120,21 @@ impl TurbineBuilder {
 impl ChainBuilder {
     /// Add an RPC endpoint with default weight (1) and no auth.
     pub fn endpoint(mut self, url: &str) -> Self {
-        self.endpoints.push(EndpointConfig { url: url.to_string(), weight: 1, auth: None });
+        self.endpoints.push(EndpointConfig {
+            url: url.to_string(),
+            weight: 1,
+            auth: None,
+        });
         self
     }
 
     /// Add an RPC endpoint with a specific weight and no auth.
     pub fn weighted_endpoint(mut self, url: &str, weight: u32) -> Self {
-        self.endpoints.push(EndpointConfig { url: url.to_string(), weight, auth: None });
+        self.endpoints.push(EndpointConfig {
+            url: url.to_string(),
+            weight,
+            auth: None,
+        });
         self
     }
 
@@ -154,7 +162,12 @@ impl ChainBuilder {
     }
 
     /// Add an RPC endpoint with a custom auth header (e.g., `x-api-key`).
-    pub fn endpoint_with_header(mut self, url: &str, header_name: &str, header_value: &str) -> Self {
+    pub fn endpoint_with_header(
+        mut self,
+        url: &str,
+        header_name: &str,
+        header_value: &str,
+    ) -> Self {
         self.endpoints.push(EndpointConfig {
             url: url.to_string(),
             weight: 1,
