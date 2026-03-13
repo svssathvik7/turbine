@@ -47,6 +47,8 @@ enum EndpointRaw {
         auth: Option<EndpointAuth>,
         #[serde(default)]
         methods: Option<Vec<String>>,
+        #[serde(default)]
+        ws_url: Option<String>,
     },
 }
 
@@ -56,6 +58,22 @@ pub struct EndpointConfig {
     pub weight: u32,
     pub auth: Option<EndpointAuth>,
     pub methods: Option<Vec<String>>,
+    pub ws_url: Option<String>,
+}
+
+impl EndpointConfig {
+    pub fn effective_ws_url(&self) -> Option<String> {
+        if let Some(ref ws) = self.ws_url {
+            return Some(ws.clone());
+        }
+        if self.url.starts_with("https://") {
+            Some(self.url.replacen("https://", "wss://", 1))
+        } else if self.url.starts_with("http://") {
+            Some(self.url.replacen("http://", "ws://", 1))
+        } else {
+            None
+        }
+    }
 }
 
 /// Authentication credentials for an upstream RPC endpoint.
@@ -86,17 +104,20 @@ impl<'de> Deserialize<'de> for EndpointConfig {
                 weight: default_weight(),
                 auth: None,
                 methods: None,
+                ws_url: None,
             },
             EndpointRaw::Full {
                 url,
                 weight,
                 auth,
                 methods,
+                ws_url,
             } => EndpointConfig {
                 url,
                 weight,
                 auth,
                 methods,
+                ws_url,
             },
         })
     }
@@ -334,5 +355,58 @@ mod tests {
         "#;
         let chain: ChainConfig = toml::from_str(toml).unwrap();
         assert!(chain.endpoints[0].methods.is_none());
+    }
+
+    #[test]
+    fn effective_ws_url_explicit() {
+        let ep = EndpointConfig {
+            url: "https://rpc.example.com".into(),
+            weight: 1,
+            auth: None,
+            methods: None,
+            ws_url: Some("wss://ws.example.com".into()),
+        };
+        assert_eq!(ep.effective_ws_url(), Some("wss://ws.example.com".into()));
+    }
+
+    #[test]
+    fn effective_ws_url_derived_https() {
+        let ep = EndpointConfig {
+            url: "https://rpc.example.com".into(),
+            weight: 1,
+            auth: None,
+            methods: None,
+            ws_url: None,
+        };
+        assert_eq!(ep.effective_ws_url(), Some("wss://rpc.example.com".into()));
+    }
+
+    #[test]
+    fn effective_ws_url_derived_http() {
+        let ep = EndpointConfig {
+            url: "http://localhost:8545".into(),
+            weight: 1,
+            auth: None,
+            methods: None,
+            ws_url: None,
+        };
+        assert_eq!(ep.effective_ws_url(), Some("ws://localhost:8545".into()));
+    }
+
+    #[test]
+    fn ws_url_config_field_parses() {
+        let toml = r#"
+            url = "https://rpc.example.com"
+            ws_url = "wss://ws.example.com"
+        "#;
+        let ep: EndpointConfig = toml::from_str(toml).unwrap();
+        assert_eq!(ep.ws_url, Some("wss://ws.example.com".into()));
+    }
+
+    #[test]
+    fn ws_url_defaults_to_none() {
+        let toml = r#"url = "https://rpc.example.com""#;
+        let ep: EndpointConfig = toml::from_str(toml).unwrap();
+        assert!(ep.ws_url.is_none());
     }
 }

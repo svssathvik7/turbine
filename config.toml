@@ -57,6 +57,13 @@ health_method = "getSlot"
 health_check_interval_seconds = 15
 max_block_lag = 50
 
+# WebSocket support: clients connect via WS to any chain route (GET /{chain})
+# WSS URLs are auto-derived from HTTPS endpoints (https→wss, http→ws)
+# Or set explicitly:
+# [[chains.endpoints]]
+# url = "https://rpc.example.com"
+# ws_url = "wss://ws.example.com"   # explicit WS URL (optional)
+
 # Latency-based rotation: routes more traffic to faster endpoints
 # [[chains]]
 # name = "polygon"

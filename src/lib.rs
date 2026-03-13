@@ -150,6 +150,7 @@ impl ChainBuilder {
             weight: 1,
             auth: None,
             methods: None,
+            ws_url: None,
         });
         self
     }
@@ -161,6 +162,7 @@ impl ChainBuilder {
             weight,
             auth: None,
             methods: None,
+            ws_url: None,
         });
         self
     }
@@ -175,6 +177,7 @@ impl ChainBuilder {
                 password: password.to_string(),
             }),
             methods: None,
+            ws_url: None,
         });
         self
     }
@@ -186,6 +189,7 @@ impl ChainBuilder {
             weight: 1,
             auth: Some(EndpointAuth::Bearer(token.to_string())),
             methods: None,
+            ws_url: None,
         });
         self
     }
@@ -205,6 +209,20 @@ impl ChainBuilder {
                 value: header_value.to_string(),
             }),
             methods: None,
+            ws_url: None,
+        });
+        self
+    }
+
+    /// Add an RPC endpoint with an explicit WebSocket URL.
+    /// If not set, WSS URLs are auto-derived from the HTTP URL (https→wss, http→ws).
+    pub fn endpoint_with_ws(mut self, url: &str, ws_url: &str) -> Self {
+        self.endpoints.push(EndpointConfig {
+            url: url.to_string(),
+            weight: 1,
+            auth: None,
+            methods: None,
+            ws_url: Some(ws_url.to_string()),
         });
         self
     }
@@ -217,6 +235,7 @@ impl ChainBuilder {
             weight: 1,
             auth: None,
             methods: Some(methods.iter().map(|s| s.to_string()).collect()),
+            ws_url: None,
         });
         self
     }

@@ -552,6 +552,7 @@ mod tests {
             weight: 1,
             auth: None,
             methods: methods.map(|m| m.into_iter().map(String::from).collect()),
+            ws_url: None,
         }
     }
 

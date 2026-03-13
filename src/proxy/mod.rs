@@ -1,10 +1,12 @@
 mod forwarder;
 mod handler;
 mod server;
+pub mod ws_handler;
 
 pub use forwarder::{ForwardError, Forwarder};
 pub use handler::proxy_handler;
 pub use server::build_router;
+pub use ws_handler::ws_proxy_handler;
 
 use crate::cache::ChainCache;
 use crate::health::ChainPool;

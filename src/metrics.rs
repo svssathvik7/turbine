@@ -10,6 +10,10 @@ pub struct ChainMetrics {
     pub cache_misses: AtomicU64,
     pub rate_limited_requests: AtomicU64,
     pub hedged_requests: AtomicU64,
+    pub ws_connections_total: AtomicU64,
+    pub ws_active_connections: AtomicU64,
+    pub ws_messages_relayed: AtomicU64,
+    pub ws_reconnections: AtomicU64,
 }
 
 impl Default for ChainMetrics {
@@ -28,6 +32,10 @@ impl ChainMetrics {
             cache_misses: AtomicU64::new(0),
             rate_limited_requests: AtomicU64::new(0),
             hedged_requests: AtomicU64::new(0),
+            ws_connections_total: AtomicU64::new(0),
+            ws_active_connections: AtomicU64::new(0),
+            ws_messages_relayed: AtomicU64::new(0),
+            ws_reconnections: AtomicU64::new(0),
         }
     }
 
@@ -74,6 +82,10 @@ impl ChainMetrics {
             cache_misses: self.cache_misses.load(Ordering::Relaxed),
             rate_limited_requests: self.rate_limited_requests.load(Ordering::Relaxed),
             hedged_requests: self.hedged_requests.load(Ordering::Relaxed),
+            ws_connections_total: self.ws_connections_total.load(Ordering::Relaxed),
+            ws_active_connections: self.ws_active_connections.load(Ordering::Relaxed),
+            ws_messages_relayed: self.ws_messages_relayed.load(Ordering::Relaxed),
+            ws_reconnections: self.ws_reconnections.load(Ordering::Relaxed),
             active_endpoints,
             total_endpoints,
         }
@@ -90,6 +102,10 @@ pub struct ChainMetricsSnapshot {
     pub cache_misses: u64,
     pub rate_limited_requests: u64,
     pub hedged_requests: u64,
+    pub ws_connections_total: u64,
+    pub ws_active_connections: u64,
+    pub ws_messages_relayed: u64,
+    pub ws_reconnections: u64,
     pub active_endpoints: usize,
     pub total_endpoints: usize,
 }

@@ -67,7 +67,7 @@ pub const DASHBOARD_HTML: &str = r##"<!DOCTYPE html>
   }
   .overview {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 16px;
     margin-bottom: 32px;
   }
@@ -383,6 +383,18 @@ function render(data) {
       <div class="value" style="color:${cacheTotal > 0 ? 'var(--cyan)' : 'var(--text-dim)'}">${cacheTotal > 0 ? pct(totalCacheHits, cacheTotal) + '%' : '--'}</div>
       <div class="sub">${formatNum(totalCacheHits)} hits / ${formatNum(totalCacheMisses)} misses</div>
     </div>
+    ${(() => {
+      const totalWsActive = data.chains.reduce((s, c) => s + (c.ws_active_connections || 0), 0);
+      const totalWsTotal = data.chains.reduce((s, c) => s + (c.ws_connections_total || 0), 0);
+      if (totalWsTotal > 0) {
+        return `<div class="stat-card">
+          <div class="label">WebSocket</div>
+          <div class="value" style="color:var(--cyan)">${formatNum(totalWsActive)}</div>
+          <div class="sub">${formatNum(totalWsTotal)} total connections</div>
+        </div>`;
+      }
+      return '';
+    })()}
   `;
 
   // Chains
@@ -462,6 +474,20 @@ function render(data) {
           <div class="ms-value">${c.active_endpoints}<span style="color:var(--text-dim);font-size:14px">/${c.total_endpoints}</span></div>
         </div>
       </div>
+      ${(c.ws_connections_total || 0) > 0 ? `<div class="chain-stats">
+        <div class="mini-stat">
+          <div class="ms-label">WS Active</div>
+          <div class="ms-value" style="color:var(--cyan)">${formatNum(c.ws_active_connections || 0)}</div>
+        </div>
+        <div class="mini-stat">
+          <div class="ms-label">WS Total</div>
+          <div class="ms-value">${formatNum(c.ws_connections_total || 0)}</div>
+        </div>
+        <div class="mini-stat">
+          <div class="ms-label">WS Messages</div>
+          <div class="ms-value">${formatNum(c.ws_messages_relayed || 0)}</div>
+        </div>
+      </div>` : ''}
       <div style="padding:12px 20px 8px">
         ${barHtml}
       </div>
