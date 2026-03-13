@@ -1,4 +1,4 @@
-use super::{proxy_handler, AppState, ChainState, Forwarder};
+use super::{proxy_handler, ws_proxy_handler, AppState, ChainState, Forwarder};
 use crate::cache::ChainCache;
 use crate::config::Config;
 use crate::dashboard::DASHBOARD_HTML;
@@ -92,7 +92,7 @@ pub fn build_router(config: &Config) -> Router {
     }
 
     router
-        .route("/{chain}", post(proxy_handler))
+        .route("/{chain}", post(proxy_handler).get(ws_proxy_handler))
         .with_state(state)
 }
 
