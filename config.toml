@@ -31,6 +31,15 @@ max_block_lag = 10
 # delay_ms = 500              # fire hedge after 500ms with no response
 # max_count = 1               # max 1 additional parallel request
 
+# Method routing: route specific methods to designated endpoints
+# [[chains.endpoints]]
+# url = "https://private-mempool-rpc.example.com"
+# methods = ["eth_sendRawTransaction"]   # only receives this method
+#
+# [[chains.endpoints]]
+# url = "https://public-rpc.example.com"
+# (no methods field = handles everything except claimed methods)
+
 # Weighted rotation with explicit weights
 [[chains]]
 name = "solana"
