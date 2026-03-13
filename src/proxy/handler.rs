@@ -121,8 +121,14 @@ pub async fn proxy_handler(
 
                 // Forward and cache the response
                 let body_bytes = serde_json::to_vec(&parsed).unwrap();
-                let result =
-                    forward_with_retry(chain_state, &body_bytes, &chain, request_count, &rpc_req.method).await;
+                let result = forward_with_retry(
+                    chain_state,
+                    &body_bytes,
+                    &chain,
+                    request_count,
+                    &rpc_req.method,
+                )
+                .await;
 
                 // Store in cache on success
                 if let (StatusCode::OK, Json(ref value)) = result {
@@ -277,9 +283,14 @@ async fn handle_batch_with_cache(
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
-        let (status, upstream_json) =
-            forward_with_retry(chain_state, &forward_body, chain, group_count, representative_method)
-                .await;
+        let (status, upstream_json) = forward_with_retry(
+            chain_state,
+            &forward_body,
+            chain,
+            group_count,
+            representative_method,
+        )
+        .await;
 
         if status != StatusCode::OK {
             return (status, upstream_json);
@@ -355,10 +366,8 @@ async fn forward_with_retry(
     let eligible = chain_state.pool.eligible_indices_for_method(method);
     if eligible.is_empty() {
         chain_state.metrics.record_failures(request_count);
-        let resp = JsonRpcResponse::proxy_error(format!(
-            "No endpoints configured for method: {}",
-            method
-        ));
+        let resp =
+            JsonRpcResponse::proxy_error(format!("No endpoints configured for method: {}", method));
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::to_value(resp).unwrap()),
@@ -373,8 +382,15 @@ async fn forward_with_retry(
         // Hedged first attempt
         if attempt == 0 {
             if let Some(ref hedge_config) = chain_state.pool.hedge_config {
-                match forward_with_hedging(chain_state, body, chain, request_count, hedge_config, &eligible)
-                    .await
+                match forward_with_hedging(
+                    chain_state,
+                    body,
+                    chain,
+                    request_count,
+                    hedge_config,
+                    &eligible,
+                )
+                .await
                 {
                     HedgeOutcome::Success(status, json) => return (status, json),
                     HedgeOutcome::AllFailed {

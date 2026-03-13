@@ -478,10 +478,7 @@ mod tests {
 
     #[test]
     fn all_unconstrained_returns_all_indices() {
-        let config = make_config(vec![
-            ep("https://a.com", None),
-            ep("https://b.com", None),
-        ]);
+        let config = make_config(vec![ep("https://a.com", None), ep("https://b.com", None)]);
         let pool = ChainPool::new(&config);
         let eligible = pool.eligible_indices_for_method("eth_call");
         assert_eq!(eligible, vec![0, 1]);
