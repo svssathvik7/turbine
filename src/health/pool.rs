@@ -46,7 +46,10 @@ impl ChainPool {
         match self.rotation {
             RotationStrategy::RoundRobin => self.next_round_robin(),
             RotationStrategy::Weighted => self.next_weighted(),
-            RotationStrategy::Latency => self.next_round_robin(), // TODO: implement in Task 2
+            RotationStrategy::Latency => {
+                let all: Vec<usize> = (0..self.endpoints.len()).collect();
+                self.next_latency_based(&all, &[])
+            }
         }
     }
 
@@ -55,7 +58,10 @@ impl ChainPool {
         match self.rotation {
             RotationStrategy::RoundRobin => self.next_round_robin_excluding(exclude),
             RotationStrategy::Weighted => self.next_weighted_excluding(exclude),
-            RotationStrategy::Latency => self.next_round_robin_excluding(exclude), // TODO: implement in Task 2
+            RotationStrategy::Latency => {
+                let all: Vec<usize> = (0..self.endpoints.len()).collect();
+                self.next_latency_based(&all, &[exclude])
+            }
         }
     }
 
@@ -133,34 +139,8 @@ impl ChainPool {
                 None
             }
             RotationStrategy::Latency => {
-                // TODO: implement in Task 2, fall back to round-robin
-                let len = self.endpoints.len();
-                let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-                let health = self.health.read().unwrap();
-                for i in 0..len {
-                    let idx = (start + i) % len;
-                    if exclude.contains(&idx) {
-                        continue;
-                    }
-                    if health[idx].is_healthy {
-                        return Some((idx, &self.endpoints[idx].url));
-                    }
-                }
-                let mut best: Option<usize> = None;
-                for i in 0..len {
-                    if exclude.contains(&i) {
-                        continue;
-                    }
-                    match best {
-                        None => best = Some(i),
-                        Some(prev) => {
-                            if health[i].failed_earlier_than(&health[prev]) {
-                                best = Some(i);
-                            }
-                        }
-                    }
-                }
-                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
+                let all: Vec<usize> = (0..self.endpoints.len()).collect();
+                self.next_latency_based(&all, exclude)
             }
         }
     }
@@ -261,6 +241,59 @@ impl ChainPool {
         }
 
         self.least_recently_failed(&health, Some(exclude))
+    }
+
+    /// Latency-based selection: effective_weight = user_weight × (1.0 / rolling_latency_ms).
+    /// Falls back to user_weight alone when no latency data exists (cold start).
+    fn next_latency_based(&self, candidates: &[usize], exclude: &[usize]) -> Option<(usize, &str)> {
+        let health = self.health.read().unwrap();
+
+        let mut effective: Vec<(usize, f64)> = Vec::new();
+        for &idx in candidates {
+            if exclude.contains(&idx) || !health[idx].is_healthy {
+                continue;
+            }
+            let user_w = self.endpoints[idx].weight as f64;
+            let eff = match health[idx].rolling_latency_ms {
+                Some(lat) if lat > 0.0 => user_w / lat,
+                _ => user_w, // cold start: use weight alone
+            };
+            effective.push((idx, eff));
+        }
+
+        if effective.is_empty() {
+            // Fallback: least recently failed within candidates
+            let mut best: Option<usize> = None;
+            for &idx in candidates {
+                if exclude.contains(&idx) {
+                    continue;
+                }
+                match best {
+                    None => best = Some(idx),
+                    Some(prev) => {
+                        if health[idx].failed_earlier_than(&health[prev]) {
+                            best = Some(idx);
+                        }
+                    }
+                }
+            }
+            return best.map(|idx| (idx, self.endpoints[idx].url.as_str()));
+        }
+
+        let total: f64 = effective.iter().map(|(_, w)| w).sum();
+        let tick = self.counter.fetch_add(1, Ordering::Relaxed) as f64;
+        let target = tick % (total * 1000.0) / 1000.0;
+        let mut cumulative = 0.0;
+        for &(idx, weight) in &effective {
+            cumulative += weight;
+            if target < cumulative {
+                return Some((idx, &self.endpoints[idx].url));
+            }
+        }
+
+        effective
+            .last()
+            .map(|&(idx, _)| (idx, self.endpoints[idx].url.as_str()))
     }
 
     fn least_recently_failed(
@@ -399,32 +432,8 @@ impl ChainPool {
                 None
             }
             RotationStrategy::Latency => {
-                // TODO: implement in Task 2, fall back to round-robin
-                let start = self.counter.fetch_add(1, Ordering::Relaxed);
-                for i in 0..eligible.len() {
-                    let idx = eligible[(start + i) % eligible.len()];
-                    if exclude.contains(&idx) {
-                        continue;
-                    }
-                    if health[idx].is_healthy {
-                        return Some((idx, &self.endpoints[idx].url));
-                    }
-                }
-                let mut best: Option<usize> = None;
-                for &idx in eligible {
-                    if exclude.contains(&idx) {
-                        continue;
-                    }
-                    match best {
-                        None => best = Some(idx),
-                        Some(prev) => {
-                            if health[idx].failed_earlier_than(&health[prev]) {
-                                best = Some(idx);
-                            }
-                        }
-                    }
-                }
-                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
+                drop(health);
+                self.next_latency_based(eligible, exclude)
             }
         }
     }
@@ -607,5 +616,91 @@ mod tests {
         let (idx, url) = pool.next_endpoint_from_eligible(&eligible, &[]).unwrap();
         assert_eq!(idx, 0);
         assert_eq!(url, "https://private.com");
+    }
+
+    fn make_latency_config(endpoints: Vec<EndpointConfig>) -> ChainConfig {
+        ChainConfig {
+            name: "test".to_string(),
+            route: "/test".to_string(),
+            endpoints,
+            health: HealthConfig {
+                max_consecutive_failures: 3,
+                cooldown_seconds: 30,
+                health_method: None,
+                health_check_interval_seconds: 30,
+                max_block_lag: 10,
+                max_retries: 1,
+                retry_delay_ms: 0,
+            },
+            rotation: RotationStrategy::Latency,
+            cache: None,
+            chain_id: None,
+            rate_limit: None,
+            hedge: None,
+        }
+    }
+
+    #[test]
+    fn latency_cold_start_falls_back_to_weights() {
+        let config =
+            make_latency_config(vec![ep("https://a.com", None), ep("https://b.com", None)]);
+        let pool = ChainPool::new(&config);
+        let result = pool.next_endpoint();
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn latency_prefers_faster_endpoint() {
+        let config = make_latency_config(vec![
+            ep("https://fast.com", None),
+            ep("https://slow.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+
+        {
+            let mut health = pool.health.write().unwrap();
+            health[0].update_latency(50);
+            health[1].update_latency(200);
+        }
+
+        let mut fast_count = 0;
+        for _ in 0..100 {
+            let (idx, _) = pool.next_endpoint().unwrap();
+            if idx == 0 {
+                fast_count += 1;
+            }
+        }
+        assert!(
+            fast_count > 60,
+            "fast={} should be > 60 out of 100",
+            fast_count
+        );
+    }
+
+    #[test]
+    fn latency_respects_user_weights() {
+        let mut ep_heavy = ep("https://heavy.com", None);
+        ep_heavy.weight = 4;
+        let config = make_latency_config(vec![ep("https://light.com", None), ep_heavy]);
+        let pool = ChainPool::new(&config);
+
+        {
+            let mut health = pool.health.write().unwrap();
+            health[0].update_latency(100);
+            health[1].update_latency(100);
+        }
+
+        let mut heavy_count = 0;
+        for _ in 0..100 {
+            let (idx, _) = pool.next_endpoint().unwrap();
+            if idx == 1 {
+                heavy_count += 1;
+            }
+        }
+        assert!(
+            heavy_count > 60,
+            "heavy={} should be > 60 out of 100",
+            heavy_count
+        );
     }
 }
