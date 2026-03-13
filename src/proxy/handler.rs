@@ -225,8 +225,8 @@ async fn handle_batch_with_cache(
 
     // routing_groups: key = sorted eligible indices as string (e.g. "0,1,2")
     //                 value = (eligible_indices, Vec<(position_in_uncached, original_batch_idx, cache_key)>)
-    let mut routing_groups: HashMap<String, (Vec<usize>, Vec<(usize, usize, Option<CacheKey>)>)> =
-        HashMap::new();
+    type RoutingGroup = (Vec<usize>, Vec<(usize, usize, Option<CacheKey>)>);
+    let mut routing_groups: HashMap<String, RoutingGroup> = HashMap::new();
 
     for (pos, &orig_idx) in uncached_indices.iter().enumerate() {
         let item = &uncached_requests[pos];
@@ -264,7 +264,7 @@ async fn handle_batch_with_cache(
     }
 
     // --- Forward each routing group as a sub-batch ---
-    for (_key, (_eligible, group)) in &routing_groups {
+    for (_eligible, group) in routing_groups.values() {
         let group_requests: Vec<serde_json::Value> = group
             .iter()
             .map(|(pos, _, _)| uncached_requests[*pos].clone())

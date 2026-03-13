@@ -440,6 +440,15 @@ impl ChainPool {
     }
 }
 
+/// Redact query parameters from URLs to avoid leaking API keys in the dashboard.
+fn redact_url(url: &str) -> String {
+    if let Some(pos) = url.find('?') {
+        format!("{}?...", &url[..pos])
+    } else {
+        url.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,14 +546,5 @@ mod tests {
         let (idx, url) = pool.next_endpoint_from_eligible(&eligible, &[]).unwrap();
         assert_eq!(idx, 0);
         assert_eq!(url, "https://private.com");
-    }
-}
-
-/// Redact query parameters from URLs to avoid leaking API keys in the dashboard.
-fn redact_url(url: &str) -> String {
-    if let Some(pos) = url.find('?') {
-        format!("{}?...", &url[..pos])
-    } else {
-        url.to_string()
     }
 }
