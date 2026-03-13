@@ -75,7 +75,9 @@ async fn handle_ws_connection(client_ws: WebSocket, state: Arc<AppState>, chain_
 
     // Track connection metrics
     metrics.ws_connections_total.fetch_add(1, Ordering::Relaxed);
-    metrics.ws_active_connections.fetch_add(1, Ordering::Relaxed);
+    metrics
+        .ws_active_connections
+        .fetch_add(1, Ordering::Relaxed);
 
     // Ensure active connections are decremented on exit
     let _guard = WsConnectionGuard { metrics };
@@ -276,10 +278,12 @@ async fn connect_upstream(
     tungstenite::Error,
 > {
     let mut request = ws_url.into_client_request().map_err(|e| {
-        tungstenite::Error::Http(Box::new(tungstenite::http::Response::builder()
-            .status(400)
-            .body(Some(format!("Invalid WS URL: {}", e).into_bytes()))
-            .unwrap()))
+        tungstenite::Error::Http(Box::new(
+            tungstenite::http::Response::builder()
+                .status(400)
+                .body(Some(format!("Invalid WS URL: {}", e).into_bytes()))
+                .unwrap(),
+        ))
     })?;
 
     // Inject auth into the upgrade request headers
@@ -300,11 +304,11 @@ async fn connect_upstream(
                 );
             }
             EndpointAuth::Header { name, value } => {
-                let header_name = tungstenite::http::HeaderName::from_bytes(name.as_bytes()).unwrap();
-                request.headers_mut().insert(
-                    header_name,
-                    HeaderValue::from_str(value).unwrap(),
-                );
+                let header_name =
+                    tungstenite::http::HeaderName::from_bytes(name.as_bytes()).unwrap();
+                request
+                    .headers_mut()
+                    .insert(header_name, HeaderValue::from_str(value).unwrap());
             }
         }
     }
