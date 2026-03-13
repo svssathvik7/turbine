@@ -209,6 +209,18 @@ impl ChainBuilder {
         self
     }
 
+    /// Add an RPC endpoint that only receives the specified methods.
+    /// Requests for other methods will not be routed to this endpoint.
+    pub fn restricted_endpoint(mut self, url: &str, methods: &[&str]) -> Self {
+        self.endpoints.push(EndpointConfig {
+            url: url.to_string(),
+            weight: 1,
+            auth: None,
+            methods: Some(methods.iter().map(|s| s.to_string()).collect()),
+        });
+        self
+    }
+
     /// Set a custom route (default: `/{name}`).
     pub fn route(mut self, route: &str) -> Self {
         self.route = route.to_string();
