@@ -149,6 +149,7 @@ impl ChainBuilder {
             url: url.to_string(),
             weight: 1,
             auth: None,
+            methods: None,
         });
         self
     }
@@ -159,6 +160,7 @@ impl ChainBuilder {
             url: url.to_string(),
             weight,
             auth: None,
+            methods: None,
         });
         self
     }
@@ -172,6 +174,7 @@ impl ChainBuilder {
                 username: username.to_string(),
                 password: password.to_string(),
             }),
+            methods: None,
         });
         self
     }
@@ -182,6 +185,7 @@ impl ChainBuilder {
             url: url.to_string(),
             weight: 1,
             auth: Some(EndpointAuth::Bearer(token.to_string())),
+            methods: None,
         });
         self
     }
@@ -200,6 +204,7 @@ impl ChainBuilder {
                 name: header_name.to_string(),
                 value: header_value.to_string(),
             }),
+            methods: None,
         });
         self
     }
