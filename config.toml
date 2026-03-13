@@ -56,3 +56,17 @@ cooldown_seconds = 60
 health_method = "getSlot"
 health_check_interval_seconds = 15
 max_block_lag = 50
+
+# Latency-based rotation: routes more traffic to faster endpoints
+# [[chains]]
+# name = "polygon"
+# route = "/polygon"
+# rotation = "latency"
+# endpoints = [
+#     { url = "https://polygon-rpc.com", weight = 1 },
+#     { url = "https://rpc.ankr.com/polygon", weight = 1 },
+# ]
+#
+# [chains.health]
+# max_consecutive_failures = 3
+# cooldown_seconds = 30

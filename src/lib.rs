@@ -263,6 +263,13 @@ impl ChainBuilder {
         self
     }
 
+    /// Set rotation strategy to latency-based.
+    /// Routes more traffic to faster endpoints using inverse-latency weighting.
+    pub fn latency_based(mut self) -> Self {
+        self.rotation = RotationStrategy::Latency;
+        self
+    }
+
     /// Enable or disable caching for this chain.
     pub fn cache(mut self, enabled: bool) -> Self {
         self.cache_enabled = enabled;

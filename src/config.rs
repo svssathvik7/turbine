@@ -136,6 +136,7 @@ pub enum RotationStrategy {
     #[default]
     RoundRobin,
     Weighted,
+    Latency,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -302,6 +303,22 @@ mod tests {
             ep.methods.unwrap(),
             vec!["eth_sendRawTransaction", "eth_sendTransaction"]
         );
+    }
+
+    #[test]
+    fn latency_rotation_strategy_parses() {
+        let toml = r#"
+            name = "ethereum"
+            route = "/ethereum"
+            rotation = "latency"
+            endpoints = ["https://rpc.example.com"]
+
+            [health]
+            max_consecutive_failures = 3
+            cooldown_seconds = 30
+        "#;
+        let chain: ChainConfig = toml::from_str(toml).unwrap();
+        assert_eq!(chain.rotation, RotationStrategy::Latency);
     }
 
     #[test]

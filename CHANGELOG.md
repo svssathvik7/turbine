@@ -2,6 +2,15 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0] - 2026-03-13
+
+### Added
+
+- **Latency-based rotation strategy**: `rotation = "latency"` routes more traffic to faster endpoints
+- Uses inverse-latency weighting combined with user-defined endpoint weights
+- Cold start: falls back to weight-only rotation until latency data exists
+- Builder API: `ChainBuilder::latency_based()`
+
 ## [0.7.0] - 2026-03-13
 
 ### Added
