@@ -122,7 +122,7 @@ pub async fn proxy_handler(
                 // Forward and cache the response
                 let body_bytes = serde_json::to_vec(&parsed).unwrap();
                 let result =
-                    forward_with_retry(chain_state, &body_bytes, &chain, request_count).await;
+                    forward_with_retry(chain_state, &body_bytes, &chain, request_count, &rpc_req.method).await;
 
                 // Store in cache on success
                 if let (StatusCode::OK, Json(ref value)) = result {
@@ -146,7 +146,15 @@ pub async fn proxy_handler(
     }
 
     // --- No cache path (original logic) ---
-    forward_with_retry(chain_state, &body, &chain, request_count).await
+    let method = if let serde_json::Value::Object(ref obj) = parsed {
+        obj.get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+    } else {
+        "unknown"
+    };
+    let method = method.to_string();
+    forward_with_retry(chain_state, &body, &chain, request_count, &method).await
 }
 
 /// Handle a batch request with cache support.
@@ -216,7 +224,7 @@ async fn handle_batch_with_cache(
     let uncached_count = uncached_requests.len() as u64;
 
     let (status, upstream_json) =
-        forward_with_retry(chain_state, &forward_body, chain, uncached_count).await;
+        forward_with_retry(chain_state, &forward_body, chain, uncached_count, "unknown").await;
 
     if status != StatusCode::OK {
         // If upstream failed, return the error for the whole batch
@@ -281,12 +289,26 @@ async fn forward_with_retry(
     body: &[u8],
     chain: &str,
     request_count: u64,
+    method: &str,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let max_retries = chain_state.pool.health_config.max_retries;
     let retry_delay_ms = chain_state.pool.health_config.retry_delay_ms;
     let total_attempts = max_retries + 1;
     let mut excluded: Vec<usize> = Vec::new();
     let mut last_error = String::new();
+
+    let eligible = chain_state.pool.eligible_indices_for_method(method);
+    if eligible.is_empty() {
+        chain_state.metrics.record_failures(request_count);
+        let resp = JsonRpcResponse::proxy_error(format!(
+            "No endpoints configured for method: {}",
+            method
+        ));
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::to_value(resp).unwrap()),
+        );
+    }
 
     for attempt in 0..total_attempts {
         if attempt > 0 && retry_delay_ms > 0 {
@@ -296,7 +318,7 @@ async fn forward_with_retry(
         // Hedged first attempt
         if attempt == 0 {
             if let Some(ref hedge_config) = chain_state.pool.hedge_config {
-                match forward_with_hedging(chain_state, body, chain, request_count, hedge_config)
+                match forward_with_hedging(chain_state, body, chain, request_count, hedge_config, &eligible)
                     .await
                 {
                     HedgeOutcome::Success(status, json) => return (status, json),
@@ -322,14 +344,9 @@ async fn forward_with_retry(
             }
         }
 
-        let endpoint_result = if excluded.is_empty() {
-            chain_state.pool.next_endpoint()
-        } else {
-            chain_state
-                .pool
-                .next_endpoint_excluding_many(&excluded)
-                .or_else(|| chain_state.pool.next_endpoint())
-        };
+        let endpoint_result = chain_state
+            .pool
+            .next_endpoint_from_eligible(&eligible, &excluded);
 
         let (idx, endpoint) = match endpoint_result {
             Some(ep) => ep,
@@ -403,9 +420,10 @@ async fn forward_with_hedging(
     chain: &str,
     request_count: u64,
     hedge_config: &HedgeConfig,
+    eligible: &[usize],
 ) -> HedgeOutcome {
     // 1. Pick primary endpoint
-    let (p_idx, p_url) = match chain_state.pool.next_endpoint() {
+    let (p_idx, p_url) = match chain_state.pool.next_endpoint_from_eligible(eligible, &[]) {
         Some((i, u)) => (i, u.to_string()),
         None => return HedgeOutcome::NoEndpoints,
     };
@@ -414,7 +432,7 @@ async fn forward_with_hedging(
     // 2. Pick hedge endpoint (different from primary)
     let hedge_ep = chain_state
         .pool
-        .next_endpoint_excluding_many(&[p_idx])
+        .next_endpoint_from_eligible(eligible, &[p_idx])
         .map(|(i, u)| (i, u.to_string()));
 
     // 3. Start primary, race against delay
