@@ -2,6 +2,19 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0] - 2026-03-13
+
+### Added
+
+- **WebSocket proxy support**: clients connect via WS to any chain route (`GET /{chain}`), Turbine relays to upstream WSS endpoints
+- Auto-derives WSS URL from HTTPS endpoint URL (`https://` → `wss://`); explicit `ws_url` override available
+- 1:1 client-to-upstream connection with bidirectional frame relay
+- Automatic reconnection to alternate endpoint on upstream failure with `turbine_reconnected` JSON-RPC notification
+- Auth injection (Basic, Bearer, Header) on upstream WS upgrade request
+- WS metrics: `ws_connections_total`, `ws_active_connections`, `ws_messages_relayed`, `ws_reconnections`
+- Builder API: `ChainBuilder::endpoint_with_ws(url, ws_url)`
+- Dashboard: WS metrics displayed per chain (conditionally, when WS is active)
+
 ## [0.8.0] - 2026-03-13
 
 ### Added
