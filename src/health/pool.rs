@@ -46,6 +46,7 @@ impl ChainPool {
         match self.rotation {
             RotationStrategy::RoundRobin => self.next_round_robin(),
             RotationStrategy::Weighted => self.next_weighted(),
+            RotationStrategy::Latency => self.next_round_robin(), // TODO: implement in Task 2
         }
     }
 
@@ -54,6 +55,7 @@ impl ChainPool {
         match self.rotation {
             RotationStrategy::RoundRobin => self.next_round_robin_excluding(exclude),
             RotationStrategy::Weighted => self.next_weighted_excluding(exclude),
+            RotationStrategy::Latency => self.next_round_robin_excluding(exclude), // TODO: implement in Task 2
         }
     }
 
@@ -129,6 +131,36 @@ impl ChainPool {
                     }
                 }
                 None
+            }
+            RotationStrategy::Latency => {
+                // TODO: implement in Task 2, fall back to round-robin
+                let len = self.endpoints.len();
+                let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
+                let health = self.health.read().unwrap();
+                for i in 0..len {
+                    let idx = (start + i) % len;
+                    if exclude.contains(&idx) {
+                        continue;
+                    }
+                    if health[idx].is_healthy {
+                        return Some((idx, &self.endpoints[idx].url));
+                    }
+                }
+                let mut best: Option<usize> = None;
+                for i in 0..len {
+                    if exclude.contains(&i) {
+                        continue;
+                    }
+                    match best {
+                        None => best = Some(i),
+                        Some(prev) => {
+                            if health[i].failed_earlier_than(&health[prev]) {
+                                best = Some(i);
+                            }
+                        }
+                    }
+                }
+                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
             }
         }
     }
@@ -366,6 +398,34 @@ impl ChainPool {
                 }
                 None
             }
+            RotationStrategy::Latency => {
+                // TODO: implement in Task 2, fall back to round-robin
+                let start = self.counter.fetch_add(1, Ordering::Relaxed);
+                for i in 0..eligible.len() {
+                    let idx = eligible[(start + i) % eligible.len()];
+                    if exclude.contains(&idx) {
+                        continue;
+                    }
+                    if health[idx].is_healthy {
+                        return Some((idx, &self.endpoints[idx].url));
+                    }
+                }
+                let mut best: Option<usize> = None;
+                for &idx in eligible {
+                    if exclude.contains(&idx) {
+                        continue;
+                    }
+                    match best {
+                        None => best = Some(idx),
+                        Some(prev) => {
+                            if health[idx].failed_earlier_than(&health[prev]) {
+                                best = Some(idx);
+                            }
+                        }
+                    }
+                }
+                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
+            }
         }
     }
 
@@ -413,6 +473,7 @@ impl ChainPool {
         match self.rotation {
             RotationStrategy::RoundRobin => "round_robin",
             RotationStrategy::Weighted => "weighted",
+            RotationStrategy::Latency => "latency",
         }
     }
 
