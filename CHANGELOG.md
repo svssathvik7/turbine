@@ -2,6 +2,17 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] - 2026-03-13
+
+### Added
+
+- **Method-based endpoint routing**: endpoints can declare a `methods` allowlist to receive only specific RPC methods
+- Route `eth_sendRawTransaction` to a private mempool RPC while other methods go to the general pool
+- Endpoints without a `methods` field handle all methods not claimed by another endpoint
+- Batch requests with mixed methods are split into routing groups and forwarded independently
+- Returns 503 with `"No endpoints configured for method: <method>"` if all eligible endpoints are unhealthy
+- Builder API: `ChainBuilder::restricted_endpoint(url, &["method1", "method2"])`
+
 ## [0.5.0] - 2026-03-12
 
 ### Added

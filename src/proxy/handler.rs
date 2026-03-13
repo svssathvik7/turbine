@@ -121,8 +121,14 @@ pub async fn proxy_handler(
 
                 // Forward and cache the response
                 let body_bytes = serde_json::to_vec(&parsed).unwrap();
-                let result =
-                    forward_with_retry(chain_state, &body_bytes, &chain, request_count).await;
+                let result = forward_with_retry(
+                    chain_state,
+                    &body_bytes,
+                    &chain,
+                    request_count,
+                    &rpc_req.method,
+                )
+                .await;
 
                 // Store in cache on success
                 if let (StatusCode::OK, Json(ref value)) = result {
@@ -146,7 +152,15 @@ pub async fn proxy_handler(
     }
 
     // --- No cache path (original logic) ---
-    forward_with_retry(chain_state, &body, &chain, request_count).await
+    let method = if let serde_json::Value::Object(ref obj) = parsed {
+        obj.get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+    } else {
+        "unknown"
+    };
+    let method = method.to_string();
+    forward_with_retry(chain_state, &body, &chain, request_count, &method).await
 }
 
 /// Handle a batch request with cache support.
@@ -206,53 +220,113 @@ async fn handle_batch_with_cache(
         return (StatusCode::OK, Json(serde_json::Value::Array(all_results)));
     }
 
-    // Forward uncached items as a batch (or single if only one)
-    let forward_body = if uncached_requests.len() == 1 {
-        serde_json::to_vec(&uncached_requests[0]).unwrap()
-    } else {
-        serde_json::to_vec(&uncached_requests).unwrap()
-    };
+    // --- Group uncached items by their eligible endpoint set ---
+    use std::collections::HashMap;
 
-    let uncached_count = uncached_requests.len() as u64;
+    // routing_groups: key = sorted eligible indices as string (e.g. "0,1,2")
+    //                 value = (eligible_indices, Vec<(position_in_uncached, original_batch_idx, cache_key)>)
+    type RoutingGroup = (Vec<usize>, Vec<(usize, usize, Option<CacheKey>)>);
+    let mut routing_groups: HashMap<String, RoutingGroup> = HashMap::new();
 
-    let (status, upstream_json) =
-        forward_with_retry(chain_state, &forward_body, chain, uncached_count).await;
+    for (pos, &orig_idx) in uncached_indices.iter().enumerate() {
+        let item = &uncached_requests[pos];
+        let cache_key = uncached_cache_keys[pos].clone();
 
-    if status != StatusCode::OK {
-        // If upstream failed, return the error for the whole batch
-        return (status, upstream_json);
+        let method = item
+            .get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        let eligible = chain_state.pool.eligible_indices_for_method(method);
+
+        if eligible.is_empty() {
+            chain_state.metrics.record_failures(batch.len() as u64);
+            let resp = JsonRpcResponse::proxy_error(format!(
+                "No endpoints configured for method: {}",
+                method
+            ));
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::to_value(resp).unwrap()),
+            );
+        }
+
+        let key = eligible
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let entry = routing_groups
+            .entry(key)
+            .or_insert_with(|| (eligible, Vec::new()));
+        entry.1.push((pos, orig_idx, cache_key));
     }
 
-    // Parse upstream responses and match back to original positions
-    let upstream_responses: Vec<serde_json::Value> = if uncached_requests.len() == 1 {
-        vec![upstream_json.0]
-    } else {
-        match upstream_json.0 {
-            serde_json::Value::Array(arr) => arr,
-            other => vec![other],
+    // --- Forward each routing group as a sub-batch ---
+    for (_eligible, group) in routing_groups.values() {
+        let group_requests: Vec<serde_json::Value> = group
+            .iter()
+            .map(|(pos, _, _)| uncached_requests[*pos].clone())
+            .collect();
+        let group_count = group_requests.len() as u64;
+
+        let forward_body = if group_requests.len() == 1 {
+            serde_json::to_vec(&group_requests[0]).unwrap()
+        } else {
+            serde_json::to_vec(&group_requests).unwrap()
+        };
+
+        // Use a representative method from this group for forward_with_retry
+        let representative_method = group_requests[0]
+            .get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        let (status, upstream_json) = forward_with_retry(
+            chain_state,
+            &forward_body,
+            chain,
+            group_count,
+            representative_method,
+        )
+        .await;
+
+        if status != StatusCode::OK {
+            return (status, upstream_json);
         }
-    };
 
-    // Match upstream responses to uncached indices by position
-    for (pos, upstream_resp) in upstream_responses.into_iter().enumerate() {
-        if pos < uncached_indices.len() {
-            let orig_idx = uncached_indices[pos];
-
-            // Store cacheable responses in cache
-            if let Some(ref cache_key) = uncached_cache_keys[pos] {
-                let response_bytes = serde_json::to_vec(&upstream_resp).unwrap();
-                cache
-                    .insert(
-                        cache_key.clone(),
-                        CachedResponse {
-                            status: 200,
-                            body: bytes::Bytes::from(response_bytes),
-                        },
-                    )
-                    .await;
+        // Parse upstream responses
+        let upstream_responses: Vec<serde_json::Value> = if group_requests.len() == 1 {
+            vec![upstream_json.0]
+        } else {
+            match upstream_json.0 {
+                serde_json::Value::Array(arr) => arr,
+                other => vec![other],
             }
+        };
 
-            results[orig_idx] = (orig_idx, Some(upstream_resp));
+        // Match responses back to original positions and cache if needed
+        for (resp_pos, upstream_resp) in upstream_responses.into_iter().enumerate() {
+            if resp_pos < group.len() {
+                let (_, orig_idx, ref cache_key_opt) = group[resp_pos];
+
+                // Store cacheable responses in cache
+                if let Some(ref cache_key) = cache_key_opt {
+                    let response_bytes = serde_json::to_vec(&upstream_resp).unwrap();
+                    cache
+                        .insert(
+                            cache_key.clone(),
+                            CachedResponse {
+                                status: 200,
+                                body: bytes::Bytes::from(response_bytes),
+                            },
+                        )
+                        .await;
+                }
+
+                results[orig_idx] = (orig_idx, Some(upstream_resp));
+            }
         }
     }
 
@@ -281,12 +355,24 @@ async fn forward_with_retry(
     body: &[u8],
     chain: &str,
     request_count: u64,
+    method: &str,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let max_retries = chain_state.pool.health_config.max_retries;
     let retry_delay_ms = chain_state.pool.health_config.retry_delay_ms;
     let total_attempts = max_retries + 1;
     let mut excluded: Vec<usize> = Vec::new();
     let mut last_error = String::new();
+
+    let eligible = chain_state.pool.eligible_indices_for_method(method);
+    if eligible.is_empty() {
+        chain_state.metrics.record_failures(request_count);
+        let resp =
+            JsonRpcResponse::proxy_error(format!("No endpoints configured for method: {}", method));
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::to_value(resp).unwrap()),
+        );
+    }
 
     for attempt in 0..total_attempts {
         if attempt > 0 && retry_delay_ms > 0 {
@@ -296,8 +382,15 @@ async fn forward_with_retry(
         // Hedged first attempt
         if attempt == 0 {
             if let Some(ref hedge_config) = chain_state.pool.hedge_config {
-                match forward_with_hedging(chain_state, body, chain, request_count, hedge_config)
-                    .await
+                match forward_with_hedging(
+                    chain_state,
+                    body,
+                    chain,
+                    request_count,
+                    hedge_config,
+                    &eligible,
+                )
+                .await
                 {
                     HedgeOutcome::Success(status, json) => return (status, json),
                     HedgeOutcome::AllFailed {
@@ -322,14 +415,9 @@ async fn forward_with_retry(
             }
         }
 
-        let endpoint_result = if excluded.is_empty() {
-            chain_state.pool.next_endpoint()
-        } else {
-            chain_state
-                .pool
-                .next_endpoint_excluding_many(&excluded)
-                .or_else(|| chain_state.pool.next_endpoint())
-        };
+        let endpoint_result = chain_state
+            .pool
+            .next_endpoint_from_eligible(&eligible, &excluded);
 
         let (idx, endpoint) = match endpoint_result {
             Some(ep) => ep,
@@ -403,9 +491,10 @@ async fn forward_with_hedging(
     chain: &str,
     request_count: u64,
     hedge_config: &HedgeConfig,
+    eligible: &[usize],
 ) -> HedgeOutcome {
     // 1. Pick primary endpoint
-    let (p_idx, p_url) = match chain_state.pool.next_endpoint() {
+    let (p_idx, p_url) = match chain_state.pool.next_endpoint_from_eligible(eligible, &[]) {
         Some((i, u)) => (i, u.to_string()),
         None => return HedgeOutcome::NoEndpoints,
     };
@@ -414,7 +503,7 @@ async fn forward_with_hedging(
     // 2. Pick hedge endpoint (different from primary)
     let hedge_ep = chain_state
         .pool
-        .next_endpoint_excluding_many(&[p_idx])
+        .next_endpoint_from_eligible(eligible, &[p_idx])
         .map(|(i, u)| (i, u.to_string()));
 
     // 3. Start primary, race against delay

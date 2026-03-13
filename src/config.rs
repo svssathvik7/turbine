@@ -45,6 +45,8 @@ enum EndpointRaw {
         weight: u32,
         #[serde(default)]
         auth: Option<EndpointAuth>,
+        #[serde(default)]
+        methods: Option<Vec<String>>,
     },
 }
 
@@ -53,6 +55,7 @@ pub struct EndpointConfig {
     pub url: String,
     pub weight: u32,
     pub auth: Option<EndpointAuth>,
+    pub methods: Option<Vec<String>>,
 }
 
 /// Authentication credentials for an upstream RPC endpoint.
@@ -82,8 +85,19 @@ impl<'de> Deserialize<'de> for EndpointConfig {
                 url,
                 weight: default_weight(),
                 auth: None,
+                methods: None,
             },
-            EndpointRaw::Full { url, weight, auth } => EndpointConfig { url, weight, auth },
+            EndpointRaw::Full {
+                url,
+                weight,
+                auth,
+                methods,
+            } => EndpointConfig {
+                url,
+                weight,
+                auth,
+                methods,
+            },
         })
     }
 }
@@ -249,6 +263,59 @@ impl Config {
                 }
             }
         }
+        for chain in &self.chains {
+            for ep in &chain.endpoints {
+                if let Some(ref methods) = ep.methods {
+                    if methods.is_empty() {
+                        eprintln!(
+                            "Warning: endpoint '{}' in chain '{}' has an empty methods list and will never receive any requests",
+                            ep.url, chain.name
+                        );
+                    }
+                }
+            }
+        }
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn endpoint_without_methods_defaults_to_none() {
+        let toml = r#"url = "https://rpc.example.com""#;
+        let ep: EndpointConfig = toml::from_str(toml).unwrap();
+        assert!(ep.methods.is_none());
+    }
+
+    #[test]
+    fn endpoint_with_methods_parses_correctly() {
+        let toml = r#"
+            url = "https://private-rpc.example.com"
+            methods = ["eth_sendRawTransaction", "eth_sendTransaction"]
+        "#;
+        let ep: EndpointConfig = toml::from_str(toml).unwrap();
+        assert_eq!(
+            ep.methods.unwrap(),
+            vec!["eth_sendRawTransaction", "eth_sendTransaction"]
+        );
+    }
+
+    #[test]
+    fn simple_string_endpoint_has_no_methods() {
+        let toml = r#"
+            name = "ethereum"
+            route = "/ethereum"
+            endpoints = ["https://rpc.example.com"]
+
+            [health]
+            max_consecutive_failures = 3
+            cooldown_seconds = 30
+        "#;
+        let chain: ChainConfig = toml::from_str(toml).unwrap();
+        assert!(chain.endpoints[0].methods.is_none());
     }
 }

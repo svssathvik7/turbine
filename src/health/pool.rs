@@ -253,6 +253,122 @@ impl ChainPool {
         best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
     }
 
+    /// Compute which endpoint indices are eligible to serve a given method.
+    ///
+    /// - If any endpoint declares `methods` containing `method`, return only those indices.
+    /// - Otherwise, return indices of endpoints with no `methods` restriction (unconstrained).
+    pub fn eligible_indices_for_method(&self, method: &str) -> Vec<usize> {
+        let claimed: Vec<usize> = self
+            .endpoints
+            .iter()
+            .enumerate()
+            .filter(|(_, ep)| {
+                ep.methods
+                    .as_ref()
+                    .map(|m| m.iter().any(|s| s == method))
+                    .unwrap_or(false)
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        if !claimed.is_empty() {
+            return claimed;
+        }
+
+        // No endpoint claims this method — use unconstrained endpoints
+        self.endpoints
+            .iter()
+            .enumerate()
+            .filter(|(_, ep)| ep.methods.is_none())
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Select the next healthy endpoint from a pre-computed eligible set.
+    /// Falls back to least-recently-failed within the eligible set if all are unhealthy.
+    /// Returns None if eligible set is empty.
+    pub fn next_endpoint_from_eligible(
+        &self,
+        eligible: &[usize],
+        exclude: &[usize],
+    ) -> Option<(usize, &str)> {
+        if eligible.is_empty() {
+            return None;
+        }
+
+        let health = self.health.read().unwrap();
+
+        match self.rotation {
+            RotationStrategy::RoundRobin => {
+                let start = self.counter.fetch_add(1, Ordering::Relaxed);
+                for i in 0..eligible.len() {
+                    let idx = eligible[(start + i) % eligible.len()];
+                    if exclude.contains(&idx) {
+                        continue;
+                    }
+                    if health[idx].is_healthy {
+                        return Some((idx, &self.endpoints[idx].url));
+                    }
+                }
+                // Fallback: least recently failed within eligible set
+                let mut best: Option<usize> = None;
+                for &idx in eligible {
+                    if exclude.contains(&idx) {
+                        continue;
+                    }
+                    match best {
+                        None => best = Some(idx),
+                        Some(prev) => {
+                            if health[idx].failed_earlier_than(&health[prev]) {
+                                best = Some(idx);
+                            }
+                        }
+                    }
+                }
+                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
+            }
+            RotationStrategy::Weighted => {
+                let healthy_weight: u32 = eligible
+                    .iter()
+                    .filter(|&&i| !exclude.contains(&i) && health[i].is_healthy)
+                    .map(|&i| self.endpoints[i].weight)
+                    .sum();
+
+                if healthy_weight == 0 {
+                    let mut best: Option<usize> = None;
+                    for &idx in eligible {
+                        if exclude.contains(&idx) {
+                            continue;
+                        }
+                        match best {
+                            None => best = Some(idx),
+                            Some(prev) => {
+                                if health[idx].failed_earlier_than(&health[prev]) {
+                                    best = Some(idx);
+                                }
+                            }
+                        }
+                    }
+                    return best.map(|idx| (idx, self.endpoints[idx].url.as_str()));
+                }
+
+                let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
+                let target = tick % healthy_weight;
+                let mut cumulative = 0u32;
+                for &idx in eligible {
+                    if exclude.contains(&idx) || !health[idx].is_healthy {
+                        continue;
+                    }
+                    cumulative += self.endpoints[idx].weight;
+                    if target < cumulative {
+                        return Some((idx, &self.endpoints[idx].url));
+                    }
+                }
+                None
+            }
+        }
+    }
+
     pub fn record_success(&self, idx: usize) {
         let mut health = self.health.write().unwrap();
         health[idx].record_success();
@@ -330,5 +446,105 @@ fn redact_url(url: &str) -> String {
         format!("{}?...", &url[..pos])
     } else {
         url.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{ChainConfig, EndpointConfig, HealthConfig, RotationStrategy};
+
+    fn make_config(endpoints: Vec<EndpointConfig>) -> ChainConfig {
+        ChainConfig {
+            name: "test".to_string(),
+            route: "/test".to_string(),
+            endpoints,
+            health: HealthConfig {
+                max_consecutive_failures: 3,
+                cooldown_seconds: 30,
+                health_method: None,
+                health_check_interval_seconds: 30,
+                max_block_lag: 10,
+                max_retries: 1,
+                retry_delay_ms: 0,
+            },
+            rotation: RotationStrategy::RoundRobin,
+            cache: None,
+            chain_id: None,
+            rate_limit: None,
+            hedge: None,
+        }
+    }
+
+    fn ep(url: &str, methods: Option<Vec<&str>>) -> EndpointConfig {
+        EndpointConfig {
+            url: url.to_string(),
+            weight: 1,
+            auth: None,
+            methods: methods.map(|m| m.into_iter().map(String::from).collect()),
+        }
+    }
+
+    #[test]
+    fn all_unconstrained_returns_all_indices() {
+        let config = make_config(vec![ep("https://a.com", None), ep("https://b.com", None)]);
+        let pool = ChainPool::new(&config);
+        let eligible = pool.eligible_indices_for_method("eth_call");
+        assert_eq!(eligible, vec![0, 1]);
+    }
+
+    #[test]
+    fn claimed_method_routes_only_to_claiming_endpoint() {
+        let config = make_config(vec![
+            ep("https://private.com", Some(vec!["eth_sendRawTransaction"])),
+            ep("https://public.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let eligible = pool.eligible_indices_for_method("eth_sendRawTransaction");
+        assert_eq!(eligible, vec![0]);
+    }
+
+    #[test]
+    fn unconstrained_endpoint_excluded_from_claimed_method() {
+        let config = make_config(vec![
+            ep("https://private.com", Some(vec!["eth_sendRawTransaction"])),
+            ep("https://public.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let eligible = pool.eligible_indices_for_method("eth_call");
+        assert_eq!(eligible, vec![1]);
+    }
+
+    #[test]
+    fn unclaimed_method_returns_only_unconstrained_endpoints() {
+        let config = make_config(vec![
+            ep("https://private.com", Some(vec!["eth_sendRawTransaction"])),
+            ep("https://public-a.com", None),
+            ep("https://public-b.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let eligible = pool.eligible_indices_for_method("eth_getBalance");
+        assert_eq!(eligible, vec![1, 2]);
+    }
+
+    #[test]
+    fn next_endpoint_from_eligible_returns_none_on_empty_set() {
+        let config = make_config(vec![ep("https://a.com", None)]);
+        let pool = ChainPool::new(&config);
+        let result = pool.next_endpoint_from_eligible(&[], &[]);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn next_endpoint_from_eligible_selects_from_eligible_only() {
+        let config = make_config(vec![
+            ep("https://private.com", Some(vec!["eth_sendRawTransaction"])),
+            ep("https://public.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let eligible = vec![0]; // only the private endpoint
+        let (idx, url) = pool.next_endpoint_from_eligible(&eligible, &[]).unwrap();
+        assert_eq!(idx, 0);
+        assert_eq!(url, "https://private.com");
     }
 }
