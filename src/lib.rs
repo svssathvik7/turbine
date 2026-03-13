@@ -214,6 +214,19 @@ impl ChainBuilder {
         self
     }
 
+    /// Add an RPC endpoint with an explicit WebSocket URL.
+    /// If not set, WSS URLs are auto-derived from the HTTP URL (https→wss, http→ws).
+    pub fn endpoint_with_ws(mut self, url: &str, ws_url: &str) -> Self {
+        self.endpoints.push(EndpointConfig {
+            url: url.to_string(),
+            weight: 1,
+            auth: None,
+            methods: None,
+            ws_url: Some(ws_url.to_string()),
+        });
+        self
+    }
+
     /// Add an RPC endpoint that only receives the specified methods.
     /// Requests for other methods will not be routed to this endpoint.
     pub fn restricted_endpoint(mut self, url: &str, methods: &[&str]) -> Self {
