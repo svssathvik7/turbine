@@ -121,15 +121,38 @@ impl TurbineBuilder {
         }
     }
 
-    /// Set a secret path for the dashboard (e.g., `"my-secret"` → `/{my-secret}`).
+    /// Serve the live dashboard at `/{secret}` (e.g., `"abc123"` → `/abc123`).
+    ///
+    /// Omitting this disables the dashboard entirely. The secret path is the only
+    /// access control — choose something unguessable.
     pub fn dashboard_secret(mut self, secret: &str) -> Self {
         self.dashboard_secret = Some(secret.to_string());
         self
     }
 
-    /// Register an API key. When any keys are registered, all proxy requests
-    /// require a valid key via `Authorization: Bearer <key>` or `X-Api-Key: <key>`.
-    /// Pass `None` for `rate_limit` to allow unlimited requests for this key.
+    /// Register an API key for inbound client authentication.
+    ///
+    /// When one or more keys are registered, **all** `/{chain}` requests must include
+    /// a valid key via `Authorization: Bearer <key>` or `X-Api-Key: <key>`.
+    /// Health (`/`), metrics, and dashboard routes remain open.
+    ///
+    /// - `name` — human-readable label used in logs
+    /// - `key` — the secret string clients must present
+    /// - `rate_limit` — optional `(max_requests, window_seconds)` quota for this key
+    ///
+    /// Invalid/missing key → HTTP 401. Per-key quota exceeded → HTTP 429.
+    /// Both responses use a JSON-RPC error body shape.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use turbine_rpc_proxy::Turbine;
+    /// Turbine::builder()
+    ///     .api_key("internal", "sk_internal_abc", None)          // unlimited
+    ///     .api_key("partner", "sk_partner_xyz", Some((500, 60))) // 500 req / 60s
+    ///     // ...add chains...
+    ///     # ;
+    /// ```
     pub fn api_key(mut self, name: &str, key: &str, rate_limit: Option<(u32, u64)>) -> Self {
         self.api_keys.push(ApiKeyConfig {
             name: name.to_string(),
