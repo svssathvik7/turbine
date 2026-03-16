@@ -164,11 +164,8 @@ turbine/
 
 ## Future
 
-- WebSocket support (subscriptions)
-- Latency-based rotation strategy
 - Prometheus metrics export format
 - Persistent metrics storage
-- Docker / deployment tooling
 - Horizontal scaling
 
 ---

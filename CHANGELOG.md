@@ -2,6 +2,16 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.10.0] - 2026-03-16
+
+### Added
+
+- **API key authentication**: define `[[server.api_keys]]` entries in config to require clients to authenticate via `Authorization: Bearer <key>` or `X-Api-Key: <key>` header
+- Per-key optional rate limiting: each API key can carry its own `[server.api_keys.rate_limit]` quota independent of the global chain rate limit
+- Open-access behaviour preserved when no keys are configured — fully backward-compatible
+- Invalid or missing key returns JSON-RPC shaped 401; per-key rate limit exceeded returns 429
+- Builder API: `TurbineBuilder::api_key(name, key, rate_limit)`
+
 ## [0.9.0] - 2026-03-13
 
 ### Added

@@ -59,19 +59,24 @@ curl -X POST http://localhost:8080/ethereum \
 
 **4. Open the dashboard:**
 
-Visit [http://localhost:8080/dashboard](http://localhost:8080/dashboard) for a live view of chain stats, endpoint health, and cache performance.
+Add `dashboard_secret = "my-secret"` to `[server]` in your config, then visit `http://localhost:8080/my-secret` for a live view of chain stats, endpoint health, and cache performance.
 
 ## Features
 
 - **Multi-chain** — configure any number of chains, each with its own endpoint pool
-- **Round-robin & weighted rotation** — distribute requests evenly or by weight
+- **Round-robin, weighted & latency-based rotation** — distribute requests evenly, by weight, or prefer the fastest endpoint
+- **Method-based endpoint routing** — restrict endpoints to specific RPC methods (e.g. route `eth_sendRawTransaction` to a private mempool)
+- **WebSocket proxy** — relay WS subscriptions to upstream WSS endpoints with automatic reconnection and auth injection
 - **Passive health tracking** — automatically detects and skips failing endpoints
 - **Active health checks** — background block-height polling to detect stale nodes
 - **Hedged requests** — fire parallel requests after a configurable delay to reduce tail latency
-- **Auto-retry** — on failure, retries with a different healthy endpoint
+- **Auto-retry** — on failure, retries with a different healthy endpoint, configurable max retries and delay
+- **Per-chain rate limiting** — configurable request quotas per time window
+- **API key authentication** — require clients to pass `Authorization: Bearer` or `X-Api-Key`, with optional per-key rate limits
+- **Chain ID routing** — route by EVM chain ID (e.g. `/1`, `/8453`) in addition to path names
 - **Response caching** — per-method TTL cache with EVM and Solana presets
 - **Upstream authentication** — per-endpoint Basic Auth, Bearer tokens, or custom headers
-- **Live dashboard** — real-time web UI at `/dashboard`
+- **Live dashboard** — real-time web UI at a configurable secret path
 - **Metrics API** — per-chain and per-endpoint stats via `/metrics` and `/api/status`
 - **Batch support** — full JSON-RPC 2.0 batch request handling
 
@@ -157,11 +162,55 @@ docker run -v $(pwd)/config.toml:/etc/turbine/config.toml -p 9090:9090 \
   svssathvik7/turbine --config /etc/turbine/config.toml --port 9090 --log-level debug
 ```
 
+## API Key Authentication
+
+When any `[[server.api_keys]]` entries are configured, all proxy requests must include a valid key. Health (`/`), metrics, and dashboard routes remain open.
+
+```toml
+[[server.api_keys]]
+name = "team-alpha"
+key  = "sk_alpha_abc123"
+[server.api_keys.rate_limit]
+max_requests   = 500
+window_seconds = 60
+
+[[server.api_keys]]
+name = "team-beta"
+key  = "sk_beta_xyz789"
+```
+
+Clients authenticate via either header:
+
+```bash
+# Authorization header
+curl -X POST http://localhost:8080/ethereum \
+  -H "Authorization: Bearer sk_alpha_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# X-Api-Key header
+curl -X POST http://localhost:8080/ethereum \
+  -H "X-Api-Key: sk_alpha_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+```
+
+## WebSocket
+
+Connect to any chain route via WebSocket for subscriptions. Turbine auto-derives the upstream WSS URL from the HTTPS endpoint:
+
+```bash
+wscat -c ws://localhost:8080/ethereum
+# With API key auth
+wscat -c ws://localhost:8080/ethereum -H "X-Api-Key: sk_alpha_abc123"
+```
+
 ## Monitoring
 
 | Endpoint | Description |
 |----------|-------------|
-| `/dashboard` | Live web dashboard with auto-refresh |
+| `/{dashboard_secret}` | Live web dashboard with auto-refresh (requires `dashboard_secret` in config) |
+| `/` | Health check — chain health summary as JSON |
 | `/api/status` | Detailed JSON with per-endpoint telemetry |
 | `/metrics` | Compact JSON with per-chain aggregate stats |
 
@@ -169,8 +218,8 @@ docker run -v $(pwd)/config.toml:/etc/turbine/config.toml -p 9090:9090 \
 
 | Architecture | Tag |
 |--------------|-----|
-| `linux/amd64` | `latest`, `0.5.0` |
-| `linux/arm64` | `latest`, `0.5.0` |
+| `linux/amd64` | `latest`, `0.10.0` |
+| `linux/arm64` | `latest`, `0.10.0` |
 
 ## Configuration Reference
 

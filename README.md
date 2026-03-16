@@ -50,16 +50,19 @@ Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxie
 ## Features
 
 - **Multi-chain** — configure any number of chains, each with its own endpoint pool
-- **Round-robin & weighted rotation** — distribute requests evenly or by weight
+- **Round-robin, weighted & latency-based rotation** — distribute requests evenly, by weight, or prefer the fastest endpoint
+- **Method-based endpoint routing** — restrict individual endpoints to specific RPC methods (e.g., route `eth_sendRawTransaction` to a private mempool endpoint)
+- **WebSocket proxy** — relay WS subscriptions to upstream WSS endpoints with automatic reconnection and auth injection
 - **Passive health tracking** — automatically detects and skips failing endpoints
 - **Active health checks** — background block-height polling to detect stale nodes
 - **Configurable retries** — set max retries and delay per chain, with automatic endpoint exclusion
 - **Hedged requests** — fire parallel requests after a configurable delay to reduce tail latency
 - **Per-chain rate limiting** — configurable request quotas per time window
+- **API key authentication** — require clients to authenticate with `Authorization: Bearer` or `X-Api-Key`, with optional per-key rate limits
 - **Chain ID routing** — route by EVM chain ID (e.g., `/1`, `/8453`) in addition to path names
 - **Response caching** — per-method TTL cache with EVM/Solana presets
 - **Upstream authentication** — per-endpoint Basic Auth, Bearer tokens, or custom headers
-- **Live dashboard** — real-time web UI at `/dashboard` showing chain and endpoint performance
+- **Live dashboard** — real-time web UI at a configurable secret path, showing chain and endpoint performance
 - **Metrics API** — per-chain and per-endpoint stats via `/metrics` and `/api/status`
 
 ## Quick Start
@@ -125,17 +128,33 @@ Full example — see [config.toml](config.toml) for a working sample.
 [server]
 host = "127.0.0.1"
 port = 8080
+dashboard_secret = "my-secret"    # dashboard served at /my-secret (omit to disable)
+
+# API key auth — when any keys are defined, all proxy requests require a valid key.
+# Clients pass the key via: Authorization: Bearer <key>  OR  X-Api-Key: <key>
+[[server.api_keys]]
+name = "internal"
+key  = "sk_internal_abc123"
+
+[[server.api_keys]]
+name = "partner"
+key  = "sk_partner_xyz789"
+[server.api_keys.rate_limit]       # optional per-key quota
+max_requests   = 500
+window_seconds = 60
 
 # ─── Ethereum ───
 [[chains]]
 name = "ethereum"
 route = "/ethereum"
 chain_id = 1                       # enables routing via POST /1
-rotation = "weighted"              # "round_robin" (default) or "weighted"
+rotation = "latency"               # "round_robin" (default), "weighted", or "latency"
 endpoints = [
     "https://eth.llamarpc.com",    # simple URL (weight defaults to 1)
     { url = "https://rpc.ankr.com/eth", weight = 2 },
     { url = "https://rpc.quicknode.com", weight = 3, auth = { header = { name = "x-api-key", value = "key-123" } } },
+    # Restrict an endpoint to specific methods (e.g. private mempool)
+    { url = "https://private-mempool.example.com", methods = ["eth_sendRawTransaction"] },
 ]
 
 [chains.health]
@@ -208,6 +227,31 @@ preset = "solana"
 |-------|------|---------|-------------|
 | `host` | string | required | IP address to bind to |
 | `port` | integer | required | Port number |
+| `dashboard_secret` | string | none | Secret path segment for the dashboard (e.g. `"abc"` → served at `/abc`). Omit to disable the dashboard entirely. |
+
+#### `[[server.api_keys]]`
+
+When one or more API keys are configured, all `/{chain}` requests must include a valid key via `Authorization: Bearer <key>` or `X-Api-Key: <key>`. Health, metrics, and dashboard routes are always open.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Human-readable label (used in logs) |
+| `key` | string | The secret key string clients must present |
+| `[server.api_keys.rate_limit]` | object | Optional per-key rate limit (see `[chains.rate_limit]` for field reference) |
+
+```toml
+[[server.api_keys]]
+name = "team-alpha"
+key  = "sk_alpha_abc123"
+[server.api_keys.rate_limit]
+max_requests   = 500
+window_seconds = 60
+
+[[server.api_keys]]
+name = "team-beta"
+key  = "sk_beta_xyz789"
+# no rate_limit = unlimited for this key
+```
 
 #### `[[chains]]`
 
@@ -216,7 +260,7 @@ preset = "solana"
 | `name` | string | required | Chain identifier (used in logs and dashboard) |
 | `route` | string | required | HTTP path prefix (e.g., `/ethereum`) |
 | `chain_id` | integer | none | EVM chain ID for numeric routing (e.g., `1` for Ethereum) |
-| `rotation` | string | `"round_robin"` | `"round_robin"` or `"weighted"` |
+| `rotation` | string | `"round_robin"` | `"round_robin"`, `"weighted"`, or `"latency"` |
 | `endpoints` | array | required | List of RPC endpoint URLs or objects |
 
 #### Endpoint formats
@@ -225,9 +269,17 @@ preset = "solana"
 # Simple string (weight = 1, no auth)
 "https://eth.llamarpc.com"
 
-# Full object
-{ url = "https://...", weight = 3, auth = { ... } }
+# Full object — all extra fields are optional
+{ url = "https://...", weight = 3, ws_url = "wss://...", methods = ["eth_sendRawTransaction"], auth = { ... } }
 ```
+
+| Endpoint field | Description |
+|----------------|-------------|
+| `url` | HTTP(S) RPC endpoint URL |
+| `weight` | Relative weight for weighted/latency rotation (default: `1`) |
+| `ws_url` | Explicit WebSocket URL. If omitted, auto-derived (`https://` → `wss://`). |
+| `methods` | Allowlist of RPC method names this endpoint accepts. Endpoints without `methods` handle everything not claimed by a restricted endpoint. |
+| `auth` | Upstream credentials (see [Authentication](#authentication)) |
 
 #### `[chains.health]`
 
@@ -302,7 +354,14 @@ Clients don't need credentials — Turbine injects them automatically when forwa
 
 ## Dashboard
 
-Turbine includes a built-in live dashboard at `GET /dashboard`. No setup needed — it's served directly from the binary.
+Turbine includes a built-in live dashboard served at a configurable secret path. Set `dashboard_secret` in `[server]` to enable it:
+
+```toml
+[server]
+dashboard_secret = "my-secret"
+```
+
+The dashboard is then available at `GET /my-secret`. Omitting `dashboard_secret` disables the dashboard entirely. The secret path is the only access control — choose something unguessable.
 
 The dashboard shows:
 - **Overview** — total requests, global success rate, active chains, cache hit rate
@@ -316,7 +375,8 @@ The page auto-refreshes every 5 seconds. It works on mobile too.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/dashboard` | GET | Live web dashboard (HTML) |
+| `/{dashboard_secret}` | GET | Live web dashboard (HTML) — only available when `dashboard_secret` is set |
+| `/` | GET | Health check — returns chain health summary as JSON |
 | `/api/status` | GET | Detailed JSON with per-endpoint telemetry |
 | `/metrics` | GET | Compact JSON with per-chain aggregate stats |
 
@@ -402,8 +462,23 @@ curl -X POST http://localhost:8080/1 \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 
-# Open dashboard in browser
-open http://localhost:8080/dashboard
+# Open dashboard in browser (replace "my-secret" with your dashboard_secret)
+open http://localhost:8080/my-secret
+
+# WebSocket subscription (wscat or any WS client)
+wscat -c ws://localhost:8080/ethereum
+
+# With API key auth
+curl -X POST http://localhost:8080/ethereum \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: sk_abc123" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+
+# Or using Authorization header
+curl -X POST http://localhost:8080/ethereum \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer sk_abc123" \
+  -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
 ## Builder API Reference
@@ -412,28 +487,45 @@ All builder methods for programmatic configuration:
 
 ```rust
 Turbine::builder()
+    // Server-level options
+    .dashboard_secret("my-secret")                  // serve dashboard at /my-secret
+    .api_key("team", "sk_abc123", None)             // require API key, unlimited
+    .api_key("partner", "sk_xyz", Some((500, 60)))  // require API key, 500 req/60s
+
     .add_chain("name")                              // start configuring a chain
         .route("/custom-route")                     // custom route (default: /{name})
+
+        // Endpoints
         .endpoint("https://...")                    // add endpoint (weight=1, no auth)
         .weighted_endpoint("https://...", 3)        // add endpoint with weight
-        .endpoint_with_basic_auth("url", "u", "p") // Basic Auth endpoint
-        .endpoint_with_bearer("url", "token")       // Bearer token endpoint
-        .endpoint_with_header("url", "key", "val")  // Custom header endpoint
+        .endpoint_with_basic_auth("url", "u", "p") // Basic Auth upstream credential
+        .endpoint_with_bearer("url", "token")       // Bearer token upstream credential
+        .endpoint_with_header("url", "key", "val")  // Custom header upstream credential
+        .endpoint_with_ws("https://...", "wss://...") // explicit WebSocket URL override
+        .restricted_endpoint("url", &["eth_sendRawTransaction"]) // method-restricted endpoint
+
+        // Rotation
+        .weighted()                                 // use weighted rotation
+        .latency_based()                            // prefer fastest endpoint
+
+        // Health
         .max_failures(3)                            // failures before unhealthy
         .cooldown_secs(30)                          // cooldown before retry
         .health_method("eth_blockNumber")           // health check RPC method
         .health_check_interval(30)                  // health check interval (secs)
         .max_block_lag(10)                          // max block lag for staleness
-        .weighted()                                 // use weighted rotation
+        .max_retries(2)                             // retry up to 2 times on failure
+        .retry_delay_ms(100)                        // 100ms between retries
+
+        // Features
         .cache(true)                                // enable caching
         .cache_preset("evm")                        // load preset TTLs
         .cache_max_capacity(10000)                  // max cache entries
-        .cache_method("eth_blockNumber", 5)         // custom method TTL
+        .cache_method("eth_blockNumber", 5)         // custom method TTL (secs)
         .chain_id(1)                                // EVM chain ID for /{id} routing
         .rate_limit(100, 60)                        // 100 requests per 60 seconds
         .hedge(500, 1)                              // hedge after 500ms, max 1 extra request
-        .max_retries(2)                             // retry up to 2 times on failure
-        .retry_delay_ms(100)                        // 100ms between retries
+
         .done()                                     // finish chain, return to builder
     .build()                                        // build Turbine instance
 ```
