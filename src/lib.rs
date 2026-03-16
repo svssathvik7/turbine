@@ -7,7 +7,7 @@ pub mod proxy;
 pub mod types;
 
 use config::{
-    CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointAuth, EndpointConfig,
+    ApiKeyConfig, CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointAuth, EndpointConfig,
     HealthConfig, HedgeConfig, RateLimitConfig, RotationStrategy, ServerConfig,
 };
 use proxy::build_router;
@@ -20,6 +20,7 @@ pub struct Turbine {
 pub struct TurbineBuilder {
     chains: Vec<ChainConfig>,
     dashboard_secret: Option<String>,
+    api_keys: Vec<ApiKeyConfig>,
 }
 
 pub struct ChainBuilder {
@@ -63,6 +64,7 @@ impl Turbine {
         TurbineBuilder {
             chains: Vec::new(),
             dashboard_secret: None,
+            api_keys: Vec::new(),
         }
     }
 
@@ -125,6 +127,21 @@ impl TurbineBuilder {
         self
     }
 
+    /// Register an API key. When any keys are registered, all proxy requests
+    /// require a valid key via `Authorization: Bearer <key>` or `X-Api-Key: <key>`.
+    /// Pass `None` for `rate_limit` to allow unlimited requests for this key.
+    pub fn api_key(mut self, name: &str, key: &str, rate_limit: Option<(u32, u64)>) -> Self {
+        self.api_keys.push(ApiKeyConfig {
+            name: name.to_string(),
+            key: key.to_string(),
+            rate_limit: rate_limit.map(|(max_requests, window_seconds)| RateLimitConfig {
+                max_requests,
+                window_seconds,
+            }),
+        });
+        self
+    }
+
     /// Build the Turbine instance.
     pub fn build(self) -> Result<Turbine, Box<dyn std::error::Error>> {
         if self.chains.is_empty() {
@@ -135,6 +152,7 @@ impl TurbineBuilder {
                 host: "127.0.0.1".to_string(),
                 port: 8080,
                 dashboard_secret: self.dashboard_secret,
+                api_keys: self.api_keys,
             },
             chains: self.chains,
         };

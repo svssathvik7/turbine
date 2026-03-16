@@ -15,6 +15,16 @@ pub struct ServerConfig {
     pub port: u16,
     #[serde(default)]
     pub dashboard_secret: Option<String>,
+    #[serde(default)]
+    pub api_keys: Vec<ApiKeyConfig>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ApiKeyConfig {
+    pub name: String,
+    pub key: String,
+    #[serde(default)]
+    pub rate_limit: Option<RateLimitConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -294,6 +304,30 @@ impl Config {
                             ep.url, chain.name
                         );
                     }
+                }
+            }
+        }
+
+        let mut seen_keys: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for ak in &self.server.api_keys {
+            if ak.key.trim().is_empty() {
+                return Err(format!("api_key '{}' has an empty key string", ak.name).into());
+            }
+            if !seen_keys.insert(&ak.key) {
+                return Err(format!("Duplicate api key value for name '{}'", ak.name).into());
+            }
+            if let Some(ref rl) = ak.rate_limit {
+                if rl.max_requests == 0 {
+                    return Err(
+                        format!("api_key '{}' rate_limit.max_requests must be > 0", ak.name)
+                            .into(),
+                    );
+                }
+                if rl.window_seconds == 0 {
+                    return Err(
+                        format!("api_key '{}' rate_limit.window_seconds must be > 0", ak.name)
+                            .into(),
+                    );
                 }
             }
         }

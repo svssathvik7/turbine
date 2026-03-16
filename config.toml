@@ -3,6 +3,22 @@ host = "127.0.0.1"
 port = 8080
 # dashboard_secret = "my-secret-path"  # dashboard at /{secret}, disabled if omitted
 
+# API key authentication — when any keys are defined, all proxy requests require a valid key.
+# Clients pass the key via:  Authorization: Bearer <key>  OR  X-Api-Key: <key>
+# Remove or comment out all [[server.api_keys]] entries to disable auth (open access).
+#
+# [[server.api_keys]]
+# name = "team-alpha"
+# key  = "sk_alpha_abc123"
+# [server.api_keys.rate_limit]
+# max_requests   = 500
+# window_seconds = 60
+#
+# [[server.api_keys]]
+# name = "team-beta"
+# key  = "sk_beta_xyz789"
+# (no rate_limit = unlimited for this key)
+
 # Round-robin (default) with simple string endpoints
 [[chains]]
 name = "ethereum"
