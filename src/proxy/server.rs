@@ -1,10 +1,11 @@
-use super::{proxy_handler, ws_proxy_handler, AppState, ChainState, Forwarder};
+use super::{auth_middleware, proxy_handler, ws_proxy_handler, AppState, AuthEntry, ChainState, Forwarder};
 use crate::cache::ChainCache;
 use crate::config::Config;
 use crate::dashboard::DASHBOARD_HTML;
 use crate::health::{spawn_health_checker, ChainPool, EndpointStatus};
 use crate::metrics::{ChainMetrics, ChainMetricsSnapshot};
 use axum::extract::State;
+use axum::middleware;
 use axum::response::{Html, Json};
 use axum::routing::{get, post};
 use axum::Router;
@@ -72,10 +73,30 @@ pub fn build_router(config: &Config) -> Router {
         chains.insert(route, chain_state);
     }
 
+    let mut api_keys: HashMap<String, AuthEntry> = HashMap::new();
+    for ak in &config.server.api_keys {
+        let rate_limiter = ak.rate_limit.as_ref().map(|rl| {
+            let period = Duration::from_secs(rl.window_seconds) / rl.max_requests;
+            let quota = Quota::with_period(period)
+                .unwrap()
+                .allow_burst(NonZeroU32::new(rl.max_requests).unwrap());
+            Arc::new(RateLimiter::direct(quota))
+        });
+        api_keys.insert(
+            ak.key.clone(),
+            AuthEntry {
+                name: ak.name.clone(),
+                rate_limiter,
+            },
+        );
+        info!(name = %ak.name, "Registered API key");
+    }
+
     let state = Arc::new(AppState {
         chains,
         chain_id_map,
         started_at: std::time::Instant::now(),
+        api_keys,
     });
 
     let mut router = Router::new()
@@ -91,9 +112,14 @@ pub fn build_router(config: &Config) -> Router {
         info!("Dashboard disabled (no dashboard_secret configured)");
     }
 
-    router
+    let chain_routes = Router::new()
         .route("/{chain}", post(proxy_handler).get(ws_proxy_handler))
-        .with_state(state)
+        .layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            auth_middleware,
+        ));
+
+    router.merge(chain_routes).with_state(state)
 }
 
 async fn metrics_handler(State(state): State<Arc<AppState>>) -> Json<Vec<ChainMetricsSnapshot>> {
