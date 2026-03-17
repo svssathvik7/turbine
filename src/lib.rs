@@ -146,7 +146,7 @@ impl TurbineBuilder {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use turbine_rpc_proxy::Turbine;
+    /// # use turbine::Turbine;
     /// Turbine::builder()
     ///     .api_key("internal", "sk_internal_abc", None)          // unlimited
     ///     .api_key("partner", "sk_partner_xyz", Some((500, 60))) // 500 req / 60s
