@@ -11,40 +11,85 @@ Multi-chain RPC proxy with intelligent endpoint rotation. Unlike EVM-only proxie
 ## How It Works
 
 ```
-                         ┌─────────────────────────────────────────────────┐
-                         │                   TURBINE                      │
-                         │                                                │
-  Client Request         │  ┌─────────┐    ┌───────────┐    ┌─────────┐  │
-  POST /ethereum    ───────>│  Route   │───>│   Cache   │───>│ Forward │──│──> Endpoint A ✓ (auth injected)
-  POST /bitcoin          │  │ Resolve  │    │  Lookup   │    │ + Retry │  │
-  POST /solana           │  └─────────┘    └───────────┘    └─────────┘  │
-                         │       │          hit? │ miss        │    │     │
-                         │       │               │             │    │     │
-                         │       │          return cached    fail  retry  │
-                         │       │                             │    │     │
-                         │       │                             ▼    │     │
-                         │       │              ┌──────────────────┐│     │
-                         │       │              │   Endpoint Pool  ││     │
-                         │       │              │                  ││     │
-                         │       │              │  A ✓  B ✓  C ✗  │├─────│──> Endpoint B ✓ (auth injected)
-                         │       │              │  round-robin /   ││     │
-                         │       │              │  weighted select ││     │
-                         │       │              └──────────────────┘│     │
-                         │       │                      ▲           │     │
-                         │       │              ┌───────┴────────┐  │     │
-                         │       │              │ Health Checker  │  │     │
-                         │       ▼              │                 │  │     │
-                         │  ┌──────────┐        │ • block height  │  │     │
-                         │  │Dashboard │        │ • stale detect  │  │     │
-                         │  │/dashboard│        │ • auto-cooldown │  │     │
-                         │  │/metrics  │        └─────────────────┘  │     │
-                         │  │/api/stat │                                   │
-                         │  └──────────┘                                   │
-                         │                                                │
-                         └─────────────────────────────────────────────────┘
-
-  Flow: Request ──> Route to chain ──> Check cache ──> Pick healthy endpoint
-        ──> Inject auth (Basic/Bearer/Header) ──> Forward ──> Hedge if slow ──> On fail, retry next
+   Client (HTTP or WebSocket)
+   │
+   │  POST /ethereum       ─── by chain name
+   │  POST /1              ─── by chain ID
+   │  GET  /ethereum (WS)  ─── WebSocket upgrade
+   │
+   ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                           TURBINE                                │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  1. API KEY AUTH                                            │ │
+│  │     Validate Authorization: Bearer <key> or X-Api-Key       │ │
+│  │     Per-key rate limit check ──── 401 / 429 if invalid      │ │
+│  └──────────────────────┬──────────────────────────────────────┘ │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  2. ROUTE RESOLVE                                           │ │
+│  │     Match path name (/ethereum) or chain ID (/1, /8453)     │ │
+│  └──────────────────────┬──────────────────────────────────────┘ │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  3. CHAIN RATE LIMIT                                        │ │
+│  │     Token bucket per chain ──── 429 if exceeded             │ │
+│  └──────────────────────┬──────────────────────────────────────┘ │
+│                         ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  4. CACHE LOOKUP                                            │ │
+│  │     Per-method TTL cache (EVM / Solana presets)              │ │
+│  │     Hit? ── return cached ──────────────────────── response  │ │
+│  └──────────────────────┬──────────────────────────────────────┘ │
+│                    miss ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  5. ENDPOINT POOL                                           │ │
+│  │                                                             │ │
+│  │     Rotation Strategy         Method Routing                │ │
+│  │     ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄       ┄┄┄┄┄┄┄┄┄┄┄┄┄┄               │ │
+│  │     • round-robin             Endpoints declare which       │ │
+│  │     • weighted                methods they accept           │ │
+│  │     • latency-based           (e.g. eth_sendRawTransaction  │ │
+│  │                                → private mempool endpoint)  │ │
+│  │     Endpoints                                               │ │
+│  │     A ✓  B ✓  C ✗  D ✓  E ✓                                │ │
+│  └──────────┬──────────────────────────────────────────────────┘ │
+│             ▼                                                    │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │  6. FORWARD + HEDGE                                         │ │
+│  │                                                             │ │
+│  │     Primary request ─────────────────────────┐              │ │
+│  │                                              │              │ │
+│  │     After delay_ms, fire hedge ──┐           │              │ │
+│  │     to a different endpoint      │  first    │              │ │
+│  │                                  │  success  │              │ │
+│  │     Inject upstream auth:        │  wins     │              │ │
+│  │     Basic / Bearer / Header      │     ┌─────┘              │ │
+│  │                                  │     │                    │ │
+│  │     Fail? ── retry with next     └─────┤                    │ │
+│  │     healthy endpoint (up to            │                    │ │
+│  │     max_retries attempts)              ▼                    │ │
+│  │                                     response                │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                  │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐ │
+│    BACKGROUND SERVICES                                         │ │
+│  │                                                             │ │
+│    Health Checker              Monitoring                      │ │
+│  │ • block height polling      GET /            health summary │ │
+│    • staleness detection       GET /metrics     chain stats    │ │
+│  │ • auto-recovery             GET /api/status  endpoint data  │ │
+│    • cooldown management       GET /{secret}    live dashboard │ │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘ │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+   │
+   ▼
+   Upstream Endpoints (auth injected automatically)
+   ├── Alchemy, QuickNode, Infura (Bearer / Header)
+   ├── Self-hosted nodes (Basic Auth)
+   └── Public RPCs (no auth)
 ```
 
 ## Features
