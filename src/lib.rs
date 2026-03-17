@@ -7,8 +7,8 @@ pub mod proxy;
 pub mod types;
 
 use config::{
-    ApiKeyConfig, CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointAuth, EndpointConfig,
-    HealthConfig, HedgeConfig, RateLimitConfig, RotationStrategy, ServerConfig,
+    ApiKeyConfig, CacheConfig, CacheMethodConfig, ChainConfig, Config, EndpointAuth,
+    EndpointConfig, HealthConfig, HedgeConfig, RateLimitConfig, RotationStrategy, ServerConfig,
 };
 use proxy::build_router;
 use std::path::Path;
