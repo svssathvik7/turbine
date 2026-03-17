@@ -1,4 +1,6 @@
-use super::{auth_middleware, proxy_handler, ws_proxy_handler, AppState, AuthEntry, ChainState, Forwarder};
+use super::{
+    auth_middleware, proxy_handler, ws_proxy_handler, AppState, AuthEntry, ChainState, Forwarder,
+};
 use crate::cache::ChainCache;
 use crate::config::Config;
 use crate::dashboard::DASHBOARD_HTML;

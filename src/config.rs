@@ -318,16 +318,18 @@ impl Config {
             }
             if let Some(ref rl) = ak.rate_limit {
                 if rl.max_requests == 0 {
-                    return Err(
-                        format!("api_key '{}' rate_limit.max_requests must be > 0", ak.name)
-                            .into(),
-                    );
+                    return Err(format!(
+                        "api_key '{}' rate_limit.max_requests must be > 0",
+                        ak.name
+                    )
+                    .into());
                 }
                 if rl.window_seconds == 0 {
-                    return Err(
-                        format!("api_key '{}' rate_limit.window_seconds must be > 0", ak.name)
-                            .into(),
-                    );
+                    return Err(format!(
+                        "api_key '{}' rate_limit.window_seconds must be > 0",
+                        ak.name
+                    )
+                    .into());
                 }
             }
         }
