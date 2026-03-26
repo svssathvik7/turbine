@@ -363,7 +363,7 @@ Rate limiting is optional per-chain. When configured, requests exceeding the lim
 | `delay_ms` | integer | required | Milliseconds to wait before firing a hedge request |
 | `max_count` | integer | `1` | Maximum number of additional parallel requests |
 
-Hedging is optional per-chain and requires at least 2 endpoints. When the primary request doesn't respond within `delay_ms`, a parallel request is sent to a different endpoint — whichever responds first wins. This dramatically reduces tail latency (p99) with minimal extra upstream load.
+Hedging is optional per-chain and requires at least 2 endpoints. When the primary request doesn't respond within `delay_ms`, up to `max_count` parallel requests are fired to different endpoints at staggered intervals — whichever responds first wins. This dramatically reduces tail latency (p99) with minimal extra upstream load.
 
 #### `[chains.cache]`
 

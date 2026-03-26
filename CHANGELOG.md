@@ -2,6 +2,33 @@
 
 All notable changes to Turbine are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.0] - 2026-03-26
+
+### Performance
+
+- **Lock-free health state**: replaced `std::sync::RwLock<Vec<EndpointHealth>>` with per-field atomics (`AtomicBool`, `AtomicU32`, `AtomicU64`). Eliminates all read/write lock contention on the hot path — every request and response is now lock-free.
+- **Multi-hedge support**: `max_count` is now respected — fires up to N parallel hedge requests using `FuturesUnordered` with staggered delays (previously hardcoded to 1 regardless of config).
+- **Parallel health checks**: background health probes now run concurrently via `join_all` instead of sequentially. With 8 endpoints and 10s timeout, worst case drops from 80s to 10s.
+- **HTTP client tuning**: increased `pool_max_idle_per_host` to 20, added `tcp_keepalive(60s)` and `pool_idle_timeout(90s)`, eliminated per-request body copy, shared single `reqwest::Client` across all chains.
+
+### Changed
+
+- Default recommended config updated: `rotation = "latency"`, `delay_ms = 200`, `max_count = 2`, `max_requests = 100`, `health_check_interval_seconds = 15`
+- Alchemy and other premium endpoints should use `weight = 3` for better latency-based routing
+
+### Added
+
+- `bench.sh` — benchmark script comparing Turbine vs eRPC (or any two RPC endpoints)
+
+### Benchmark Results (Ethereum Sepolia)
+
+| Metric | v0.10.0 | v1.0.0 | Improvement |
+|--------|---------|--------|-------------|
+| Burst throughput (50 concurrent) | 9.6 req/s | 123+ req/s | **12.9x** |
+| Burst p99 latency | 19.9s | 0.57s | **35x** |
+| Heavy burst throughput (100 concurrent) | 197 req/s | 245 req/s | **1.25x** |
+| Heavy burst p99 latency | 1.49s | 0.78s | **1.9x** |
+
 ## [0.10.0] - 2026-03-16
 
 ### Added
