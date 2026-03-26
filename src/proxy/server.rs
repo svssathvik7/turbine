@@ -7,6 +7,7 @@ use crate::dashboard::DASHBOARD_HTML;
 use crate::health::{spawn_health_checker, ChainPool, EndpointStatus};
 use crate::metrics::{ChainMetrics, ChainMetricsSnapshot};
 use axum::extract::State;
+use axum::extract::{FromRequest, Path};
 use axum::middleware;
 use axum::response::{Html, Json};
 use axum::routing::{get, post};
@@ -22,6 +23,7 @@ use tracing::info;
 pub fn build_router(config: &Config) -> Router {
     let mut chains = HashMap::new();
     let mut chain_id_map = HashMap::new();
+    let shared_client = Forwarder::shared_client();
 
     for chain_config in &config.chains {
         let route = chain_config.route.trim_start_matches('/').to_string();
@@ -61,7 +63,7 @@ pub fn build_router(config: &Config) -> Router {
         let chain_state = ChainState {
             pool,
             metrics: ChainMetrics::new(),
-            forwarder: Forwarder::new(),
+            forwarder: Forwarder::with_client(shared_client.clone()),
             cache,
             rate_limiter,
         };
@@ -115,7 +117,7 @@ pub fn build_router(config: &Config) -> Router {
     }
 
     let chain_routes = Router::new()
-        .route("/{chain}", post(proxy_handler).get(ws_proxy_handler))
+        .route("/{chain}", post(proxy_handler).get(chain_get_handler))
         .layer(middleware::from_fn_with_state(
             Arc::clone(&state),
             auth_middleware,
@@ -253,6 +255,38 @@ async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthRespon
     rpc.sort_by(|a, b| a.alias.cmp(&b.alias));
 
     Json(HealthResponse { rpc })
+}
+
+/// GET handler for chain routes.
+/// If the request is a WebSocket upgrade, delegates to the WS proxy handler.
+/// Otherwise, returns a simple text response (e.g. for health checks or browsers).
+async fn chain_get_handler(
+    Path(chain): Path<String>,
+    State(state): State<Arc<AppState>>,
+    request: axum::extract::Request,
+) -> axum::response::Response {
+    // Check if this is a WebSocket upgrade request
+    let is_upgrade = request
+        .headers()
+        .get(axum::http::header::UPGRADE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.eq_ignore_ascii_case("websocket"));
+
+    if is_upgrade {
+        // Extract WebSocketUpgrade from the request and delegate
+        match axum::extract::ws::WebSocketUpgrade::from_request(request, &state).await {
+            Ok(ws) => ws_proxy_handler(ws, Path(chain), State(state)).await,
+            Err(rejection) => axum::response::IntoResponse::into_response(rejection),
+        }
+    } else {
+        axum::response::IntoResponse::into_response((
+            axum::http::StatusCode::OK,
+            format!(
+                "RPC proxy route /{} is active. Use POST for JSON-RPC requests or connect via WebSocket.",
+                chain
+            ),
+        ))
+    }
 }
 
 async fn dashboard_handler() -> Html<&'static str> {

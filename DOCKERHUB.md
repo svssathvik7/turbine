@@ -218,8 +218,8 @@ wscat -c ws://localhost:8080/ethereum -H "X-Api-Key: sk_alpha_abc123"
 
 | Architecture | Tag |
 |--------------|-----|
-| `linux/amd64` | `latest`, `0.10.0` |
-| `linux/arm64` | `latest`, `0.10.0` |
+| `linux/amd64` | `latest`, `1.0.0` |
+| `linux/arm64` | `latest`, `1.0.0` |
 
 ## Configuration Reference
 

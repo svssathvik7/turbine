@@ -21,12 +21,13 @@ Unlike eRPC (which is EVM-only), Turbine is chain-agnostic — any blockchain th
 
 - **Round-robin rotation** — cycles through healthy endpoints sequentially (default)
 - **Weighted rotation** — distributes requests proportional to configured weights
-- **Lock-free selection** — uses atomic counters, no mutex contention
+- **Latency-based rotation** — routes more traffic to faster endpoints using inverse-latency weighting
+- **Lock-free selection** — all health state uses per-field atomics (`AtomicBool`, `AtomicU32`, `AtomicU64`), zero lock contention on the hot path
 
 ### Health Tracking
 
 - **Passive tracking** — counts consecutive failures per endpoint, marks unhealthy after threshold
-- **Active health checks** — background task polls block height on each endpoint periodically
+- **Active health checks** — background task polls block height on all endpoints concurrently (parallel via `join_all`)
 - **Staleness detection** — marks endpoints unhealthy if they lag behind by more than `max_block_lag` blocks
 - **Auto-recovery** — unhealthy endpoints are retried after cooldown; stale endpoints re-enabled when caught up
 - **Fallback** — if all endpoints are unhealthy, picks the least-recently-failed one
@@ -89,9 +90,9 @@ Unlike eRPC (which is EVM-only), Turbine is chain-agnostic — any blockchain th
 | **Server** | `proxy/server.rs` | HTTP server (axum), route registration, dashboard/metrics handlers |
 | **Handler** | `proxy/handler.rs` | JSON-RPC request parsing, batch handling, cache integration, retry logic |
 | **Forwarder** | `proxy/forwarder.rs` | HTTP forwarding with auth injection, error classification, latency measurement |
-| **Endpoint Pool** | `health/pool.rs` | Endpoint selection (round-robin/weighted), health state access |
-| **Health State** | `health/state.rs` | Per-endpoint failure counts, block height, latency tracking |
-| **Health Checker** | `health/checker.rs` | Background block-height polling, staleness detection |
+| **Endpoint Pool** | `health/pool.rs` | Endpoint selection (round-robin/weighted/latency), lock-free health state access |
+| **Health State** | `health/state.rs` | Per-endpoint atomic counters (failures, block height, latency, request stats) |
+| **Health Checker** | `health/checker.rs` | Concurrent block-height polling via `join_all`, staleness detection |
 | **Cache** | `cache.rs` | Moka async cache, presets, per-method TTL, batch splitting |
 | **Metrics** | `metrics.rs` | Atomic counters per chain (requests, successes, failures, cache hits/misses) |
 | **Dashboard** | `dashboard.rs` | Self-contained HTML/CSS/JS dashboard page |
@@ -111,6 +112,7 @@ Unlike eRPC (which is EVM-only), Turbine is chain-agnostic — any blockchain th
 | `tracing` | Structured logging |
 | `clap 4` | CLI argument parsing |
 | `moka 0.12` | Async in-memory cache |
+| `futures-util 0.3` | `FuturesUnordered` for multi-hedge racing, `join_all` for parallel health checks |
 | `bytes 1` | Efficient byte handling |
 
 ---
@@ -121,14 +123,15 @@ Unlike eRPC (which is EVM-only), Turbine is chain-agnostic — any blockchain th
 2. Router matches the path to a chain
 3. If caching is enabled, check cache for a hit
 4. On cache hit: return cached response, increment `cache_hits`
-5. On cache miss: select next healthy endpoint via rotation strategy
-6. Forwarder sends request to endpoint (with auth injected), measures latency
-7. On success: return response, cache it if cacheable, record latency, increment `successful_requests`
-8. On failure (timeout, connection error, HTTP 429/5xx):
-   - Record failure on endpoint, increment failure counter
+5. On cache miss: select next healthy endpoint via rotation strategy (round-robin, weighted, or latency-based)
+6. If hedging is enabled: fire primary request, then after `delay_ms` fire up to `max_count` parallel hedges to different endpoints — first success wins
+7. Forwarder sends request to endpoint (with auth injected), measures latency
+8. On success: return response, cache it if cacheable, record latency atomically, increment `successful_requests`
+9. On failure (timeout, connection error, HTTP 429/5xx):
+   - Record failure atomically on endpoint, increment failure counter
    - If failures >= threshold, mark endpoint unhealthy
-   - Retry with the next healthy endpoint (max 1 retry)
-9. If retry also fails: return JSON-RPC error to client, increment `failed_requests`
+   - Retry with the next healthy endpoint (up to `max_retries` attempts)
+10. If all retries fail: return JSON-RPC error to client, increment `failed_requests`
 
 ---
 

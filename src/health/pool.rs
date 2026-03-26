@@ -2,14 +2,13 @@ use super::state::EndpointStatus;
 use super::EndpointHealth;
 use crate::config::{ChainConfig, EndpointConfig, HealthConfig, HedgeConfig, RotationStrategy};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::RwLock;
 
 #[derive(Debug)]
 pub struct ChainPool {
     pub name: String,
     pub endpoints: Vec<EndpointConfig>,
     pub counter: AtomicUsize,
-    pub health: RwLock<Vec<EndpointHealth>>,
+    pub health: Vec<EndpointHealth>,
     pub health_config: HealthConfig,
     pub rotation: RotationStrategy,
     pub chain_id: Option<u64>,
@@ -32,7 +31,7 @@ impl ChainPool {
             name: config.name.clone(),
             endpoints: config.endpoints.clone(),
             counter: AtomicUsize::new(0),
-            health: RwLock::new(health_states),
+            health: health_states,
             health_config: config.health.clone(),
             rotation: config.rotation.clone(),
             chain_id: config.chain_id,
@@ -71,13 +70,12 @@ impl ChainPool {
             RotationStrategy::RoundRobin => {
                 let len = self.endpoints.len();
                 let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-                let health = self.health.read().unwrap();
                 for i in 0..len {
                     let idx = (start + i) % len;
                     if exclude.contains(&idx) {
                         continue;
                     }
-                    if health[idx].is_healthy {
+                    if self.health[idx].is_healthy() {
                         return Some((idx, &self.endpoints[idx].url));
                     }
                 }
@@ -90,7 +88,7 @@ impl ChainPool {
                     match best {
                         None => best = Some(i),
                         Some(prev) => {
-                            if health[i].failed_earlier_than(&health[prev]) {
+                            if self.health[i].failed_earlier_than(&self.health[prev]) {
                                 best = Some(i);
                             }
                         }
@@ -99,12 +97,11 @@ impl ChainPool {
                 best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
             }
             RotationStrategy::Weighted => {
-                let health = self.health.read().unwrap();
                 let healthy_weight: u32 = self
                     .endpoints
                     .iter()
                     .enumerate()
-                    .filter(|(i, _)| !exclude.contains(i) && health[*i].is_healthy)
+                    .filter(|(i, _)| !exclude.contains(i) && self.health[*i].is_healthy())
                     .map(|(_, e)| e.weight)
                     .sum();
                 if healthy_weight == 0 {
@@ -116,7 +113,7 @@ impl ChainPool {
                         match best {
                             None => best = Some(i),
                             Some(prev) => {
-                                if health[i].failed_earlier_than(&health[prev]) {
+                                if self.health[i].failed_earlier_than(&self.health[prev]) {
                                     best = Some(i);
                                 }
                             }
@@ -128,7 +125,7 @@ impl ChainPool {
                 let target = tick % healthy_weight;
                 let mut cumulative = 0u32;
                 for (i, ep) in self.endpoints.iter().enumerate() {
-                    if exclude.contains(&i) || !health[i].is_healthy {
+                    if exclude.contains(&i) || !self.health[i].is_healthy() {
                         continue;
                     }
                     cumulative += ep.weight;
@@ -148,50 +145,46 @@ impl ChainPool {
     fn next_round_robin(&self) -> Option<(usize, &str)> {
         let len = self.endpoints.len();
         let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-        let health = self.health.read().unwrap();
 
         for i in 0..len {
             let idx = (start + i) % len;
-            if health[idx].is_healthy {
+            if self.health[idx].is_healthy() {
                 return Some((idx, &self.endpoints[idx].url));
             }
         }
 
-        self.least_recently_failed(&health, None)
+        self.least_recently_failed(None)
     }
 
     fn next_round_robin_excluding(&self, exclude: usize) -> Option<(usize, &str)> {
         let len = self.endpoints.len();
         let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-        let health = self.health.read().unwrap();
 
         for i in 0..len {
             let idx = (start + i) % len;
             if idx == exclude {
                 continue;
             }
-            if health[idx].is_healthy {
+            if self.health[idx].is_healthy() {
                 return Some((idx, &self.endpoints[idx].url));
             }
         }
 
-        self.least_recently_failed(&health, Some(exclude))
+        self.least_recently_failed(Some(exclude))
     }
 
     fn next_weighted(&self) -> Option<(usize, &str)> {
-        let health = self.health.read().unwrap();
-
         // Calculate total healthy weight
         let healthy_weight: u32 = self
             .endpoints
             .iter()
             .enumerate()
-            .filter(|(i, _)| health[*i].is_healthy)
+            .filter(|(i, _)| self.health[*i].is_healthy())
             .map(|(_, e)| e.weight)
             .sum();
 
         if healthy_weight == 0 {
-            return self.least_recently_failed(&health, None);
+            return self.least_recently_failed(None);
         }
 
         let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
@@ -199,7 +192,7 @@ impl ChainPool {
         let mut cumulative = 0u32;
 
         for (i, ep) in self.endpoints.iter().enumerate() {
-            if !health[i].is_healthy {
+            if !self.health[i].is_healthy() {
                 continue;
             }
             cumulative += ep.weight;
@@ -208,22 +201,20 @@ impl ChainPool {
             }
         }
 
-        self.least_recently_failed(&health, None)
+        self.least_recently_failed(None)
     }
 
     fn next_weighted_excluding(&self, exclude: usize) -> Option<(usize, &str)> {
-        let health = self.health.read().unwrap();
-
         let healthy_weight: u32 = self
             .endpoints
             .iter()
             .enumerate()
-            .filter(|(i, _)| *i != exclude && health[*i].is_healthy)
+            .filter(|(i, _)| *i != exclude && self.health[*i].is_healthy())
             .map(|(_, e)| e.weight)
             .sum();
 
         if healthy_weight == 0 {
-            return self.least_recently_failed(&health, Some(exclude));
+            return self.least_recently_failed(Some(exclude));
         }
 
         let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
@@ -231,7 +222,7 @@ impl ChainPool {
         let mut cumulative = 0u32;
 
         for (i, ep) in self.endpoints.iter().enumerate() {
-            if i == exclude || !health[i].is_healthy {
+            if i == exclude || !self.health[i].is_healthy() {
                 continue;
             }
             cumulative += ep.weight;
@@ -240,21 +231,19 @@ impl ChainPool {
             }
         }
 
-        self.least_recently_failed(&health, Some(exclude))
+        self.least_recently_failed(Some(exclude))
     }
 
     /// Latency-based selection: effective_weight = user_weight × (1.0 / rolling_latency_ms).
     /// Falls back to user_weight alone when no latency data exists (cold start).
     fn next_latency_based(&self, candidates: &[usize], exclude: &[usize]) -> Option<(usize, &str)> {
-        let health = self.health.read().unwrap();
-
         let mut effective: Vec<(usize, f64)> = Vec::new();
         for &idx in candidates {
-            if exclude.contains(&idx) || !health[idx].is_healthy {
+            if exclude.contains(&idx) || !self.health[idx].is_healthy() {
                 continue;
             }
             let user_w = self.endpoints[idx].weight as f64;
-            let eff = match health[idx].rolling_latency_ms {
+            let eff = match self.health[idx].rolling_latency_ms() {
                 Some(lat) if lat > 0.0 => user_w / lat,
                 _ => user_w, // cold start: use weight alone
             };
@@ -271,7 +260,7 @@ impl ChainPool {
                 match best {
                     None => best = Some(idx),
                     Some(prev) => {
-                        if health[idx].failed_earlier_than(&health[prev]) {
+                        if self.health[idx].failed_earlier_than(&self.health[prev]) {
                             best = Some(idx);
                         }
                     }
@@ -296,11 +285,7 @@ impl ChainPool {
             .map(|&(idx, _)| (idx, self.endpoints[idx].url.as_str()))
     }
 
-    fn least_recently_failed(
-        &self,
-        health: &[EndpointHealth],
-        exclude: Option<usize>,
-    ) -> Option<(usize, &str)> {
+    fn least_recently_failed(&self, exclude: Option<usize>) -> Option<(usize, &str)> {
         let mut best: Option<usize> = None;
         for i in 0..self.endpoints.len() {
             if Some(i) == exclude {
@@ -309,7 +294,7 @@ impl ChainPool {
             match best {
                 None => best = Some(i),
                 Some(prev) => {
-                    if health[i].failed_earlier_than(&health[prev]) {
+                    if self.health[i].failed_earlier_than(&self.health[prev]) {
                         best = Some(i);
                     }
                 }
@@ -361,8 +346,6 @@ impl ChainPool {
             return None;
         }
 
-        let health = self.health.read().unwrap();
-
         match self.rotation {
             RotationStrategy::RoundRobin => {
                 let start = self.counter.fetch_add(1, Ordering::Relaxed);
@@ -371,7 +354,7 @@ impl ChainPool {
                     if exclude.contains(&idx) {
                         continue;
                     }
-                    if health[idx].is_healthy {
+                    if self.health[idx].is_healthy() {
                         return Some((idx, &self.endpoints[idx].url));
                     }
                 }
@@ -384,7 +367,7 @@ impl ChainPool {
                     match best {
                         None => best = Some(idx),
                         Some(prev) => {
-                            if health[idx].failed_earlier_than(&health[prev]) {
+                            if self.health[idx].failed_earlier_than(&self.health[prev]) {
                                 best = Some(idx);
                             }
                         }
@@ -395,7 +378,7 @@ impl ChainPool {
             RotationStrategy::Weighted => {
                 let healthy_weight: u32 = eligible
                     .iter()
-                    .filter(|&&i| !exclude.contains(&i) && health[i].is_healthy)
+                    .filter(|&&i| !exclude.contains(&i) && self.health[i].is_healthy())
                     .map(|&i| self.endpoints[i].weight)
                     .sum();
 
@@ -408,7 +391,7 @@ impl ChainPool {
                         match best {
                             None => best = Some(idx),
                             Some(prev) => {
-                                if health[idx].failed_earlier_than(&health[prev]) {
+                                if self.health[idx].failed_earlier_than(&self.health[prev]) {
                                     best = Some(idx);
                                 }
                             }
@@ -421,7 +404,7 @@ impl ChainPool {
                 let target = tick % healthy_weight;
                 let mut cumulative = 0u32;
                 for &idx in eligible {
-                    if exclude.contains(&idx) || !health[idx].is_healthy {
+                    if exclude.contains(&idx) || !self.health[idx].is_healthy() {
                         continue;
                     }
                     cumulative += self.endpoints[idx].weight;
@@ -431,31 +414,24 @@ impl ChainPool {
                 }
                 None
             }
-            RotationStrategy::Latency => {
-                drop(health);
-                self.next_latency_based(eligible, exclude)
-            }
+            RotationStrategy::Latency => self.next_latency_based(eligible, exclude),
         }
     }
 
     pub fn record_success(&self, idx: usize) {
-        let mut health = self.health.write().unwrap();
-        health[idx].record_success();
+        self.health[idx].record_success();
     }
 
     pub fn record_failure(&self, idx: usize) {
-        let mut health = self.health.write().unwrap();
-        health[idx].record_failure(self.health_config.max_consecutive_failures);
+        self.health[idx].record_failure(self.health_config.max_consecutive_failures);
     }
 
     pub fn mark_stale(&self, idx: usize) {
-        let mut health = self.health.write().unwrap();
-        health[idx].is_healthy = false;
+        self.health[idx].mark_unhealthy();
     }
 
     pub fn healthy_count(&self) -> usize {
-        let health = self.health.read().unwrap();
-        health.iter().filter(|h| h.is_healthy).count()
+        self.health.iter().filter(|h| h.is_healthy()).count()
     }
 
     pub fn total_weight(&self) -> u32 {
@@ -463,19 +439,16 @@ impl ChainPool {
     }
 
     pub fn update_block_height(&self, idx: usize, height: u64) {
-        let mut health = self.health.write().unwrap();
-        health[idx].update_block_height(height);
+        self.health[idx].update_block_height(height);
     }
 
     pub fn update_latency(&self, idx: usize, latency_ms: u64) {
-        let mut health = self.health.write().unwrap();
-        health[idx].update_latency(latency_ms);
+        self.health[idx].update_latency(latency_ms);
     }
 
     pub fn record_success_with_latency(&self, idx: usize, latency_ms: u64) {
-        let mut health = self.health.write().unwrap();
-        health[idx].record_success();
-        health[idx].update_latency(latency_ms);
+        self.health[idx].record_success();
+        self.health[idx].update_latency(latency_ms);
     }
 
     pub fn rotation_name(&self) -> &str {
@@ -487,23 +460,22 @@ impl ChainPool {
     }
 
     pub fn endpoint_statuses(&self) -> Vec<EndpointStatus> {
-        let health = self.health.read().unwrap();
         self.endpoints
             .iter()
             .enumerate()
             .map(|(i, ep)| {
-                let h = &health[i];
+                let snap = self.health[i].snapshot();
                 EndpointStatus {
                     url: redact_url(&ep.url),
                     weight: ep.weight,
-                    is_healthy: h.is_healthy,
-                    consecutive_failures: h.consecutive_failures,
-                    block_height: h.block_height,
-                    last_latency_ms: h.last_latency_ms,
-                    rolling_latency_ms: h.rolling_latency_ms,
-                    request_count: h.request_count,
-                    success_count: h.success_count,
-                    failure_count: h.failure_count,
+                    is_healthy: snap.is_healthy,
+                    consecutive_failures: snap.consecutive_failures,
+                    block_height: snap.block_height,
+                    last_latency_ms: snap.last_latency_ms,
+                    rolling_latency_ms: snap.rolling_latency_ms,
+                    request_count: snap.request_count,
+                    success_count: snap.success_count,
+                    failure_count: snap.failure_count,
                 }
             })
             .collect()
@@ -658,11 +630,8 @@ mod tests {
         ]);
         let pool = ChainPool::new(&config);
 
-        {
-            let mut health = pool.health.write().unwrap();
-            health[0].update_latency(50);
-            health[1].update_latency(200);
-        }
+        pool.health[0].update_latency(50);
+        pool.health[1].update_latency(200);
 
         let mut fast_count = 0;
         for _ in 0..100 {
@@ -685,11 +654,8 @@ mod tests {
         let config = make_latency_config(vec![ep("https://light.com", None), ep_heavy]);
         let pool = ChainPool::new(&config);
 
-        {
-            let mut health = pool.health.write().unwrap();
-            health[0].update_latency(100);
-            health[1].update_latency(100);
-        }
+        pool.health[0].update_latency(100);
+        pool.health[1].update_latency(100);
 
         let mut heavy_count = 0;
         for _ in 0..100 {

@@ -14,12 +14,28 @@ impl Default for Forwarder {
 
 impl Forwarder {
     pub fn new() -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .expect("Failed to build HTTP client");
+        Self {
+            client: Self::build_client(),
+        }
+    }
 
+    pub fn with_client(client: Client) -> Self {
         Self { client }
+    }
+
+    fn build_client() -> Client {
+        Client::builder()
+            .timeout(Duration::from_secs(30))
+            .pool_max_idle_per_host(20)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Duration::from_secs(60))
+            .build()
+            .expect("Failed to build HTTP client")
+    }
+
+    /// Build a shared client for reuse across multiple Forwarder instances.
+    pub fn shared_client() -> Client {
+        Self::build_client()
     }
 
     /// Forwards a request to an upstream endpoint.
@@ -34,7 +50,7 @@ impl Forwarder {
             .client
             .post(endpoint)
             .header("Content-Type", "application/json")
-            .body(body.to_vec());
+            .body(bytes::Bytes::copy_from_slice(body));
 
         if let Some(auth) = auth {
             req = match auth {
