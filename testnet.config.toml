@@ -1,0 +1,314 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+dashboard_secret = "hashira-dashboard"
+
+# ─── Ethereum Sepolia (chainId: 11155111) ───
+[[chains]]
+name = "ethereum_sepolia"
+route = "/ethereum_sepolia"
+chain_id = 11155111
+rotation = "latency"
+endpoints = [
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://rpc.sepolia.org",
+  "https://rpc2.sepolia.org",
+  "https://eth-sepolia.public.blastapi.io",
+  "https://1rpc.io/sepolia",
+  "https://sepolia.gateway.tenderly.co",
+  "https://endpoints.omniatech.io/v1/eth/sepolia/public",
+  "https://sepolia.drpc.org",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Base Sepolia (chainId: 84532) ───
+[[chains]]
+name = "base_sepolia"
+route = "/base_sepolia"
+chain_id = 84532
+rotation = "latency"
+endpoints = [
+  { url = "https://base-sepolia.g.alchemy.com/v2/MDRJjPZvJTT86lBZnbmbF", weight = 3 },
+  "https://sepolia.base.org",
+  "https://base-sepolia-rpc.publicnode.com",
+  "https://base-sepolia.gateway.tenderly.co",
+  "https://base-sepolia.drpc.org",
+  "https://rpc.notadegen.com/base/sepolia",
+  "https://base-sepolia.api.onfinality.io/public",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Arbitrum Sepolia (chainId: 421614) ───
+[[chains]]
+name = "arbitrum_sepolia"
+route = "/arbitrum_sepolia"
+chain_id = 421614
+rotation = "latency"
+endpoints = [
+  "https://sepolia-rollup.arbitrum.io/rpc",
+  "https://arbitrum-sepolia-rpc.publicnode.com",
+  "https://arbitrum-sepolia.gateway.tenderly.co",
+  "https://arbitrum-sepolia.drpc.org",
+  "https://endpoints.omniatech.io/v1/arbitrum/sepolia/public",
+  "https://arbitrum-sepolia.api.onfinality.io/public",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Citrea Testnet (chainId: 5115) ───
+[[chains]]
+name = "citrea_testnet"
+route = "/citrea_testnet"
+chain_id = 5115
+rotation = "latency"
+endpoints = [
+  "https://rpc.testnet.citrea.xyz",
+  { url = "https://citrea-testnet.g.alchemy.com/v2/wzd8L5cGN-7Ddf_8yUnNwUfHI3JTo12s", weight = 3 },
+  { url = "https://citrea-testnet.g.alchemy.com/v2/DumcaFO69U55TqhPevuTScTlDzxhvy0N", weight = 3 },
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Monad Testnet (chainId: 10143) ───
+[[chains]]
+name = "monad_testnet"
+route = "/monad_testnet"
+chain_id = 10143
+rotation = "latency"
+endpoints = [
+  { url = "https://monad-testnet.g.alchemy.com/v2/zO4UcK4cd7zLT-xj6RlQgLOPFsM2jyHe", weight = 3 },
+  "https://testnet-rpc.monad.xyz",
+  "https://monad-testnet.drpc.org",
+  "https://rpc.ankr.com/monad_testnet",
+  "https://monad-testnet.api.onfinality.io/public",
+  "https://monad-testnet-rpc.huginn.tech",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── BNBChain Testnet (chainId: 97) ───
+[[chains]]
+name = "bnbchain_testnet"
+route = "/bnbchain_testnet"
+chain_id = 97
+rotation = "latency"
+endpoints = [
+  "https://bnb-testnet.api.onfinality.io/public",
+  "https://bsc-testnet-rpc.publicnode.com",
+  "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+  "https://data-seed-prebsc-2-s1.bnbchain.org:8545",
+  "https://data-seed-prebsc-1-s2.bnbchain.org:8545",
+  "https://bsc-testnet.public.blastapi.io",
+  "https://bsc-testnet.drpc.org",
+  "https://endpoints.omniatech.io/v1/bsc/testnet/public",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Alpen Testnet (chainId: 8150) ───
+[[chains]]
+name = "alpen_testnet"
+route = "/alpen_testnet"
+chain_id = 8150
+rotation = "latency"
+endpoints = [
+  "https://rpc.testnet.alpenlabs.io",
+  "https://rpc.pectra-testnet.alpenlabs.io",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+
+# ─── Solana Testnet ───
+[[chains]]
+name = "solana_testnet"
+route = "/solana_testnet"
+rotation = "latency"
+endpoints = [
+  "https://api.devnet.solana.com",
+  { url = "https://solana-devnet.g.alchemy.com/v2/zNaEBgfGOlytWH45Zg9Gw", weight = 3 },
+  "https://rpc.ankr.com/solana_devnet",
+  "https://solana-devnet.drpc.org",
+  "https://solana-devnet.api.onfinality.io/public",
+  "https://solana-devnet.gateway.tatum.io",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_method = "getSlot"
+health_check_interval_seconds = 15
+max_block_lag = 50
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "solana"
+
+# ─── Starknet Sepolia ───
+[[chains]]
+name = "starknet_sepolia"
+route = "/starknet_sepolia"
+rotation = "latency"
+endpoints = [
+  { url = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/79fDgzmOXcd58df-HqzVn", weight = 3 },
+  { url = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/R8rnpg08qAWLAVKcWa-xL", weight = 3 },
+  "https://starknet-sepolia.public.blastapi.io",
+  "https://starknet-sepolia.drpc.org",
+  "https://starknet-sepolia-rpc.publicnode.com",
+  "https://free-rpc.nethermind.io/sepolia-juno/v0_7",
+  "https://starknet-sepolia.reddio.com/rpc/v0_7",
+]
+
+[chains.health]
+max_consecutive_failures = 3
+cooldown_seconds = 30
+health_method = "starknet_blockNumber"
+health_check_interval_seconds = 15
+max_block_lag = 10
+max_retries = 4
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 200
+max_count = 2

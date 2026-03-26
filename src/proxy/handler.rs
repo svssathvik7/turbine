@@ -6,6 +6,9 @@ use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::Json;
+use futures_util::stream::FuturesUnordered;
+use futures_util::StreamExt;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, warn};
@@ -483,8 +486,8 @@ enum HedgeOutcome {
     NoEndpoints,
 }
 
-/// Forward a request with hedging: fire primary, and if it doesn't respond
-/// within `delay_ms`, fire a hedge to a different endpoint. First success wins.
+/// Forward a request with hedging: fire primary, and after each `delay_ms`,
+/// fire additional hedges up to `max_count`. First success wins.
 async fn forward_with_hedging(
     chain_state: &ChainState,
     body: &[u8],
@@ -493,131 +496,129 @@ async fn forward_with_hedging(
     hedge_config: &HedgeConfig,
     eligible: &[usize],
 ) -> HedgeOutcome {
+    type ForwardFuture<'a> = Pin<
+        Box<
+            dyn std::future::Future<
+                    Output = (
+                        usize,
+                        Result<(u16, bytes::Bytes, u64), crate::proxy::forwarder::ForwardError>,
+                    ),
+                > + Send
+                + 'a,
+        >,
+    >;
+
     // 1. Pick primary endpoint
     let (p_idx, p_url) = match chain_state.pool.next_endpoint_from_eligible(eligible, &[]) {
         Some((i, u)) => (i, u.to_string()),
         None => return HedgeOutcome::NoEndpoints,
     };
+
+    let mut used_indices: Vec<usize> = vec![p_idx];
+    let mut failed_indices: Vec<usize> = Vec::new();
+
+    // 2. Start primary request
     let p_auth = chain_state.pool.endpoints[p_idx].auth.as_ref();
-
-    // 2. Pick hedge endpoint (different from primary)
-    let hedge_ep = chain_state
-        .pool
-        .next_endpoint_from_eligible(eligible, &[p_idx])
-        .map(|(i, u)| (i, u.to_string()));
-
-    // 3. Start primary, race against delay
-    let primary_fut = chain_state.forwarder.forward(&p_url, body, p_auth);
-    tokio::pin!(primary_fut);
+    let mut in_flight: FuturesUnordered<ForwardFuture> = FuturesUnordered::new();
+    let idx = p_idx;
+    in_flight.push(Box::pin(async move {
+        let result = chain_state.forwarder.forward(&p_url, body, p_auth).await;
+        (idx, result)
+    }));
 
     let delay = Duration::from_millis(hedge_config.delay_ms);
-    let primary_early = tokio::select! {
-        result = &mut primary_fut => Some(result),
-        _ = tokio::time::sleep(delay) => None,
-    };
+    let max_hedges = hedge_config.max_count as usize;
+    let mut hedges_fired: usize = 0;
 
-    // 4a. Primary responded before delay — return it, no hedge fired
-    if let Some(Ok((_status, ref bytes, latency))) = primary_early {
-        chain_state.pool.record_success_with_latency(p_idx, latency);
-        chain_state.metrics.record_successes(request_count);
-        return HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)));
-    }
+    // 3. Race loop: poll in-flight futures vs hedge delay timer
+    loop {
+        let can_hedge = hedges_fired < max_hedges;
 
-    // 4b. Primary failed before delay — record failure, try hedge sequentially
-    if let Some(Err(e)) = primary_early {
-        chain_state.pool.record_failure(p_idx);
-        warn!(chain = %chain, endpoint = %p_url, error = %e, "Primary failed before hedge delay");
-        if let Some((h_idx, ref h_url)) = hedge_ep {
-            chain_state.metrics.record_hedged_requests(1);
-            let h_auth = chain_state.pool.endpoints[h_idx].auth.as_ref();
-            match chain_state.forwarder.forward(h_url, body, h_auth).await {
-                Ok((_status, ref bytes, latency)) => {
-                    chain_state.pool.record_success_with_latency(h_idx, latency);
-                    chain_state.metrics.record_successes(request_count);
-                    return HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)));
-                }
-                Err(e2) => {
-                    chain_state.pool.record_failure(h_idx);
-                    return HedgeOutcome::AllFailed {
-                        last_err: e2.to_string(),
-                        failed_indices: vec![p_idx, h_idx],
-                    };
-                }
-            }
-        }
-        return HedgeOutcome::AllFailed {
-            last_err: e.to_string(),
-            failed_indices: vec![p_idx],
-        };
-    }
-
-    // 5. Delay expired, primary still running. Fire hedge and race.
-    let Some((h_idx, ref h_url)) = hedge_ep else {
-        // No hedge endpoint available — just await primary
-        return match primary_fut.await {
-            Ok((_status, ref bytes, latency)) => {
-                chain_state.pool.record_success_with_latency(p_idx, latency);
-                chain_state.metrics.record_successes(request_count);
-                HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)))
-            }
-            Err(e) => {
-                chain_state.pool.record_failure(p_idx);
-                HedgeOutcome::AllFailed {
-                    last_err: e.to_string(),
-                    failed_indices: vec![p_idx],
-                }
-            }
-        };
-    };
-
-    chain_state.metrics.record_hedged_requests(1);
-    debug!(chain = %chain, "Hedge delay expired, firing hedge to alternate endpoint");
-
-    let h_auth = chain_state.pool.endpoints[h_idx].auth.as_ref();
-    let hedge_fut = chain_state.forwarder.forward(h_url, body, h_auth);
-    tokio::pin!(hedge_fut);
-
-    // Race primary vs hedge — if first responder fails, await the other
-    let (first_result, first_idx, second_is_primary) = tokio::select! {
-        r = &mut primary_fut => (r, p_idx, false),
-        r = &mut hedge_fut => (r, h_idx, true),
-    };
-
-    match first_result {
-        Ok((_status, ref bytes, latency)) => {
-            // Winner succeeded — loser is dropped/cancelled
-            chain_state
-                .pool
-                .record_success_with_latency(first_idx, latency);
-            chain_state.metrics.record_successes(request_count);
-            HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)))
-        }
-        Err(e) => {
-            // First responder failed — await the other
-            chain_state.pool.record_failure(first_idx);
-            warn!(chain = %chain, error = %e, "First responder failed, awaiting other");
-
-            let second_result = if second_is_primary {
-                primary_fut.await
-            } else {
-                hedge_fut.await
-            };
-            let second_idx = if second_is_primary { p_idx } else { h_idx };
-
-            match second_result {
-                Ok((_status, ref bytes, latency)) => {
-                    chain_state
-                        .pool
-                        .record_success_with_latency(second_idx, latency);
-                    chain_state.metrics.record_successes(request_count);
-                    HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)))
-                }
-                Err(e2) => {
-                    chain_state.pool.record_failure(second_idx);
-                    HedgeOutcome::AllFailed {
-                        last_err: e2.to_string(),
-                        failed_indices: vec![p_idx, h_idx],
+        if can_hedge {
+            tokio::select! {
+                biased;
+                Some((idx, result)) = in_flight.next() => {
+                    match result {
+                        Ok((_status, ref bytes, latency)) => {
+                            chain_state.pool.record_success_with_latency(idx, latency);
+                            chain_state.metrics.record_successes(request_count);
+                            return HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)));
+                        }
+                        Err(e) => {
+                            chain_state.pool.record_failure(idx);
+                            failed_indices.push(idx);
+                            warn!(chain = %chain, error = %e, "Hedged request failed");
+                            // If no more in-flight and can't hedge more, give up
+                            if in_flight.is_empty() && hedges_fired >= max_hedges {
+                                return HedgeOutcome::AllFailed {
+                                    last_err: e.to_string(),
+                                    failed_indices,
+                                };
+                            }
+                            // If no more in-flight but can still hedge, fire immediately
+                            if in_flight.is_empty() {
+                                if let Some((h_idx, h_url)) = chain_state.pool.next_endpoint_from_eligible(eligible, &used_indices).map(|(i, u)| (i, u.to_string())) {
+                                    used_indices.push(h_idx);
+                                    hedges_fired += 1;
+                                    chain_state.metrics.record_hedged_requests(1);
+                                    let h_auth = chain_state.pool.endpoints[h_idx].auth.as_ref();
+                                    in_flight.push(Box::pin(async move {
+                                        let result = chain_state.forwarder.forward(&h_url, body, h_auth).await;
+                                        (h_idx, result)
+                                    }));
+                                } else {
+                                    return HedgeOutcome::AllFailed {
+                                        last_err: e.to_string(),
+                                        failed_indices,
+                                    };
+                                }
+                            }
+                        }
                     }
+                }
+                _ = tokio::time::sleep(delay) => {
+                    // Delay expired, fire next hedge
+                    if let Some((h_idx, h_url)) = chain_state.pool.next_endpoint_from_eligible(eligible, &used_indices).map(|(i, u)| (i, u.to_string())) {
+                        used_indices.push(h_idx);
+                        hedges_fired += 1;
+                        chain_state.metrics.record_hedged_requests(1);
+                        debug!(chain = %chain, hedge = hedges_fired, "Firing hedge request");
+                        let h_auth = chain_state.pool.endpoints[h_idx].auth.as_ref();
+                        in_flight.push(Box::pin(async move {
+                            let result = chain_state.forwarder.forward(&h_url, body, h_auth).await;
+                            (h_idx, result)
+                        }));
+                    }
+                    // If no new endpoint available, just continue waiting for in-flight
+                }
+            }
+        } else {
+            // No more hedges to fire, just await remaining in-flight
+            match in_flight.next().await {
+                Some((idx, result)) => match result {
+                    Ok((_status, ref bytes, latency)) => {
+                        chain_state.pool.record_success_with_latency(idx, latency);
+                        chain_state.metrics.record_successes(request_count);
+                        return HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)));
+                    }
+                    Err(e) => {
+                        chain_state.pool.record_failure(idx);
+                        failed_indices.push(idx);
+                        warn!(chain = %chain, error = %e, "Hedged request failed");
+                        if in_flight.is_empty() {
+                            return HedgeOutcome::AllFailed {
+                                last_err: e.to_string(),
+                                failed_indices,
+                            };
+                        }
+                    }
+                },
+                None => {
+                    // All futures completed without success
+                    return HedgeOutcome::AllFailed {
+                        last_err: "All hedged endpoints exhausted".to_string(),
+                        failed_indices,
+                    };
                 }
             }
         }

@@ -1,5 +1,6 @@
 use super::ChainPool;
 use crate::config::{default_health_method, EndpointAuth};
+use futures_util::future::join_all;
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
@@ -86,20 +87,36 @@ async fn fetch_block_heights(
     pool: &ChainPool,
     method: &str,
 ) -> Vec<(usize, Option<u64>)> {
-    let mut results = Vec::with_capacity(pool.endpoints.len());
+    let futures: Vec<_> = pool
+        .endpoints
+        .iter()
+        .enumerate()
+        .map(|(idx, endpoint)| {
+            let client = client.clone();
+            let method = method.to_string();
+            let url = endpoint.url.clone();
+            let auth = endpoint.auth.clone();
+            async move {
+                let start = std::time::Instant::now();
+                let height =
+                    fetch_block_height(&client, &url, &method, auth.as_ref()).await;
+                let latency_ms = start.elapsed().as_millis() as u64;
+                (idx, height, latency_ms)
+            }
+        })
+        .collect();
 
-    for (idx, endpoint) in pool.endpoints.iter().enumerate() {
-        let start = std::time::Instant::now();
-        let height =
-            fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
-        let latency_ms = start.elapsed().as_millis() as u64;
-        if height.is_some() {
-            pool.update_latency(idx, latency_ms);
-        }
-        results.push((idx, height));
-    }
+    let results = join_all(futures).await;
 
     results
+        .into_iter()
+        .map(|(idx, height, latency_ms)| {
+            if height.is_some() {
+                pool.update_latency(idx, latency_ms);
+            }
+            (idx, height)
+        })
+        .collect()
 }
 
 async fn fetch_block_height(
