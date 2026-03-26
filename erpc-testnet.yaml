@@ -1,0 +1,1018 @@
+logLevel: info
+
+projects:
+  - id: rpc
+    providers:
+      - id: public
+        vendor: repository
+      - id: envio
+        vendor: envio
+
+    upstreams:
+      # ===== Ethereum Sepolia (11155111) =====
+      # -- Private / API-key endpoints (higher score) --
+      - id: alchemy-eth-sepolia-1
+        type: evm
+        endpoint: "https://eth-sepolia.g.alchemy.com/v2/demo"
+        evm:
+          chainId: 11155111
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      # -- Public endpoints --
+      - id: pub-eth-sepolia-1
+        type: evm
+        endpoint: "https://ethereum-sepolia-rpc.publicnode.com"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-2
+        type: evm
+        endpoint: "https://rpc.sepolia.org"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-3
+        type: evm
+        endpoint: "https://rpc2.sepolia.org"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-4
+        type: evm
+        endpoint: "https://rpc.sepolia.ethpandaops.io"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-5
+        type: evm
+        endpoint: "https://eth-sepolia.public.blastapi.io"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-6
+        type: evm
+        endpoint: "https://1rpc.io/sepolia"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-7
+        type: evm
+        endpoint: "https://sepolia.gateway.tenderly.co"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-8
+        type: evm
+        endpoint: "https://gateway.tenderly.co/public/sepolia"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-9
+        type: evm
+        endpoint: "https://endpoints.omniatech.io/v1/eth/sepolia/public"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-10
+        type: evm
+        endpoint: "https://sepolia.drpc.org"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-11
+        type: evm
+        endpoint: "https://eth-sepolia-public.unifra.io"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-12
+        type: evm
+        endpoint: "https://eth-sepolia.api.onfinality.io/public"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-13
+        type: evm
+        endpoint: "https://public.stackup.sh/api/v1/node/ethereum-sepolia"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-14
+        type: evm
+        endpoint: "https://ethereum-sepolia-public.nodies.app"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-15
+        type: evm
+        endpoint: "https://api.zan.top/eth-sepolia"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-16
+        type: evm
+        endpoint: "https://rpc.notadegen.com/eth/sepolia"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-17
+        type: evm
+        endpoint: "https://ethereum-sepolia.blockpi.network/v1/rpc/public"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-18
+        type: evm
+        endpoint: "https://ethereum-sepolia.rpc.subquery.network/public"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-19
+        type: evm
+        endpoint: "https://0xrpc.io/sep"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-20
+        type: evm
+        endpoint: "https://ethereum-sepolia.therpc.io"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-21
+        type: evm
+        endpoint: "https://ethereum-sepolia.gateway.tatum.io"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-eth-sepolia-22
+        type: evm
+        endpoint: "https://rpc.sentio.xyz/sepolia"
+        evm:
+          chainId: 11155111
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Base Sepolia (84532) =====
+      # -- Private --
+      - id: alchemy-base-sepolia-1
+        type: evm
+        endpoint: "https://base-sepolia.g.alchemy.com/v2/MDRJjPZvJTT86lBZnbmbF"
+        evm:
+          chainId: 84532
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      # -- Public --
+      - id: pub-base-sepolia-1
+        type: evm
+        endpoint: "https://sepolia.base.org"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-2
+        type: evm
+        endpoint: "https://sepolia-preconf.base.org"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-3
+        type: evm
+        endpoint: "https://base-sepolia-rpc.publicnode.com"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-4
+        type: evm
+        endpoint: "https://base-sepolia.drpc.org"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-5
+        type: evm
+        endpoint: "https://base-sepolia.gateway.tenderly.co"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-6
+        type: evm
+        endpoint: "https://base-sepolia-public.nodies.app"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-7
+        type: evm
+        endpoint: "https://base-sepolia.therpc.io"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-8
+        type: evm
+        endpoint: "https://base-sepolia.api.onfinality.io/public"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-9
+        type: evm
+        endpoint: "https://public.stackup.sh/api/v1/node/base-sepolia"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-10
+        type: evm
+        endpoint: "https://rpc.notadegen.com/base/sepolia"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-11
+        type: evm
+        endpoint: "https://rpc.sentio.xyz/base-sepolia"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-base-sepolia-12
+        type: evm
+        endpoint: "https://endpoints.omniatech.io/v1/base/sepolia/public"
+        evm:
+          chainId: 84532
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Arbitrum Sepolia (421614) =====
+      - id: pub-arb-sepolia-1
+        type: evm
+        endpoint: "https://sepolia-rollup.arbitrum.io/rpc"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-2
+        type: evm
+        endpoint: "https://arbitrum-sepolia-rpc.publicnode.com"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-3
+        type: evm
+        endpoint: "https://arbitrum-sepolia.gateway.tenderly.co"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-4
+        type: evm
+        endpoint: "https://arbitrum-sepolia.drpc.org"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-5
+        type: evm
+        endpoint: "https://endpoints.omniatech.io/v1/arbitrum/sepolia/public"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-6
+        type: evm
+        endpoint: "https://arbitrum-sepolia.api.onfinality.io/public"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-7
+        type: evm
+        endpoint: "https://arbitrum-sepolia.therpc.io"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-8
+        type: evm
+        endpoint: "https://public.stackup.sh/api/v1/node/arbitrum-sepolia"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-9
+        type: evm
+        endpoint: "https://api.zan.top/arb-sepolia"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-arb-sepolia-10
+        type: evm
+        endpoint: "https://arbitrum-one-sepolia.gateway.tatum.io"
+        evm:
+          chainId: 421614
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Citrea Testnet (5115) =====
+      # -- Private --
+      - id: alchemy-citrea-1
+        type: evm
+        endpoint: "https://citrea-testnet.g.alchemy.com/v2/wzd8L5cGN-7Ddf_8yUnNwUfHI3JTo12s"
+        evm:
+          chainId: 5115
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-citrea-2
+        type: evm
+        endpoint: "https://citrea-testnet.g.alchemy.com/v2/DumcaFO69U55TqhPevuTScTlDzxhvy0N"
+        evm:
+          chainId: 5115
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      # -- Public --
+      - id: pub-citrea-1
+        type: evm
+        endpoint: "https://rpc.testnet.citrea.xyz"
+        evm:
+          chainId: 5115
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-citrea-2
+        type: evm
+        endpoint: "https://5115.rpc.thirdweb.com"
+        evm:
+          chainId: 5115
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Monad Testnet (10143) =====
+      # -- Private --
+      - id: alchemy-monad-testnet-1
+        type: evm
+        endpoint: "https://monad-testnet.g.alchemy.com/v2/zO4UcK4cd7zLT-xj6RlQgLOPFsM2jyHe"
+        evm:
+          chainId: 10143
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      # -- Public --
+      - id: pub-monad-testnet-1
+        type: evm
+        endpoint: "https://testnet-rpc.monad.xyz"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-2
+        type: evm
+        endpoint: "https://rpc-testnet.monadinfra.com"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-3
+        type: evm
+        endpoint: "https://monad-testnet.drpc.org"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-4
+        type: evm
+        endpoint: "https://rpc.ankr.com/monad_testnet"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-5
+        type: evm
+        endpoint: "https://monad-testnet.gateway.tatum.io"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-6
+        type: evm
+        endpoint: "https://monad-testnet.api.onfinality.io/public"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-7
+        type: evm
+        endpoint: "https://monad-testnet-rpc.huginn.tech"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-8
+        type: evm
+        endpoint: "https://monad-testnet.gateway.tenderly.co"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-monad-testnet-9
+        type: evm
+        endpoint: "https://10143.rpc.thirdweb.com"
+        evm:
+          chainId: 10143
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== BNBChain Testnet (97) =====
+      - id: pub-bnb-testnet-1
+        type: evm
+        endpoint: "https://bsc-testnet-dataseed.bnbchain.org"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-2
+        type: evm
+        endpoint: "https://bsc-testnet.bnbchain.org"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-3
+        type: evm
+        endpoint: "https://bsc-prebsc-dataseed.bnbchain.org"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-4
+        type: evm
+        endpoint: "https://data-seed-prebsc-1-s1.bnbchain.org:8545"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-5
+        type: evm
+        endpoint: "https://data-seed-prebsc-2-s1.bnbchain.org:8545"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-6
+        type: evm
+        endpoint: "https://data-seed-prebsc-1-s2.bnbchain.org:8545"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-7
+        type: evm
+        endpoint: "https://data-seed-prebsc-2-s2.bnbchain.org:8545"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-8
+        type: evm
+        endpoint: "https://data-seed-prebsc-1-s3.bnbchain.org:8545"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-9
+        type: evm
+        endpoint: "https://data-seed-prebsc-2-s3.bnbchain.org:8545"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-10
+        type: evm
+        endpoint: "https://bsc-testnet.public.blastapi.io"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-11
+        type: evm
+        endpoint: "https://bsc-testnet-rpc.publicnode.com"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-12
+        type: evm
+        endpoint: "https://bsc-testnet.drpc.org"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-13
+        type: evm
+        endpoint: "https://bsc-testnet.therpc.io"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-14
+        type: evm
+        endpoint: "https://bnb-testnet.api.onfinality.io/public"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-15
+        type: evm
+        endpoint: "https://endpoints.omniatech.io/v1/bsc/testnet/public"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-16
+        type: evm
+        endpoint: "https://api.zan.top/bsc-testnet"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-17
+        type: evm
+        endpoint: "https://public.stackup.sh/api/v1/node/bsc-testnet"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-18
+        type: evm
+        endpoint: "https://bsctestapi.terminet.io/rpc"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-bnb-testnet-19
+        type: evm
+        endpoint: "https://rpc.sentio.xyz/bsc-testnet"
+        evm:
+          chainId: 97
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Alpen Testnet (8150) =====
+      - id: pub-alpen-1
+        type: evm
+        endpoint: "https://rpc.testnet.alpenlabs.io"
+        evm:
+          chainId: 8150
+        rateLimitBudget: high
+        group: fallback
+
+      - id: pub-alpen-2
+        type: evm
+        endpoint: "https://rpc.pectra-testnet.alpenlabs.io"
+        evm:
+          chainId: 8150
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== HyperEVM Testnet (998) =====
+      - id: hyperevm-testnet-1
+        type: evm
+        endpoint: "https://rpc.hyperliquid-testnet.xyz/evm"
+        evm:
+          chainId: 998
+        rateLimitBudget: high
+        group: fallback
+
+      - id: hyperevm-testnet-2
+        type: evm
+        endpoint: "https://api.hyperliquid-testnet.xyz/evm"
+        evm:
+          chainId: 998
+        rateLimitBudget: high
+        group: fallback
+
+      - id: hyperevm-testnet-3
+        type: evm
+        endpoint: "https://spectrum-01.simplystaking.xyz/hyperliquid-tn-rpc/evm"
+        evm:
+          chainId: 998
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Ethereum Mainnet (1) =====
+      # -- Private --
+      - id: alchemy-ethereum-1
+        type: evm
+        endpoint: "https://eth-mainnet.g.alchemy.com/v2/7BAao5LOsJuXpqQCKO0oQ"
+        evm:
+          chainId: 1
+        routing:
+          scoreMultipliers:
+            - overall: 100
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-ethereum-2
+        type: evm
+        endpoint: "https://eth-mainnet.g.alchemy.com/v2/PNkxVdMUMdomZ2yeT1fvMOONkkRBFc_Q"
+        evm:
+          chainId: 1
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-ethereum-3
+        type: evm
+        endpoint: "https://eth-mainnet.g.alchemy.com/v2/7JKkGJTSOT-1tZvpbY09i"
+        evm:
+          chainId: 1
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: ankr-ethereum-1
+        type: evm
+        endpoint: "https://rpc.ankr.com/eth/bc0fb296415993c1eccfc983e9b8f4881272efa66f8f92fa916ea053b2bb768c"
+        evm:
+          chainId: 1
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: drpc-ethereum-1
+        type: evm
+        endpoint: "https://lb.drpc.live/ethereum/Asxi4k1CuEIbiIqVb2QT19GVqUbZv4ER8JGbQmlfqV1j"
+        evm:
+          chainId: 1
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Base Mainnet (8453) =====
+      # -- Private --
+      - id: alchemy-base-1
+        type: evm
+        endpoint: "https://base-mainnet.g.alchemy.com/v2/DumcaFO69U55TqhPevuTScTlDzxhvy0N"
+        evm:
+          chainId: 8453
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-base-2
+        type: evm
+        endpoint: "https://base-mainnet.g.alchemy.com/v2/PNkxVdMUMdomZ2yeT1fvMOONkkRBFc_Q"
+        evm:
+          chainId: 8453
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-base-3
+        type: evm
+        endpoint: "https://base-mainnet.g.alchemy.com/v2/7JKkGJTSOT-1tZvpbY09i"
+        evm:
+          chainId: 8453
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: ankr-base-1
+        type: evm
+        endpoint: "https://rpc.ankr.com/base/bc0fb296415993c1eccfc983e9b8f4881272efa66f8f92fa916ea053b2bb768c"
+        evm:
+          chainId: 8453
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: drpc-base-1
+        type: evm
+        endpoint: "https://lb.drpc.live/base/Asxi4k1CuEIbiIqVb2QT19HXzfxsv4ER8JGcQmlfqV1j"
+        evm:
+          chainId: 8453
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      # ===== Arbitrum One (42161) =====
+      # -- Private --
+      - id: alchemy-arbitrum-1
+        type: evm
+        endpoint: "https://arb-mainnet.g.alchemy.com/v2/7JKkGJTSOT-1tZvpbY09i"
+        evm:
+          chainId: 42161
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-arbitrum-2
+        type: evm
+        endpoint: "https://arb-mainnet.g.alchemy.com/v2/PNkxVdMUMdomZ2yeT1fvMOONkkRBFc_Q"
+        evm:
+          chainId: 42161
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: alchemy-arbitrum-3
+        type: evm
+        endpoint: "https://arb-mainnet.g.alchemy.com/v2/DumcaFO69U55TqhPevuTScTlDzxhvy0N"
+        evm:
+          chainId: 42161
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: drpc-arbitrum-1
+        type: evm
+        endpoint: "https://lb.drpc.live/arbitrum/Asxi4k1CuEIbiIqVb2QT19GVqUbZv4ER8JGbQmlfqV1j"
+        evm:
+          chainId: 42161
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+      - id: ankr-arbitrum-1
+        type: evm
+        endpoint: "https://rpc.ankr.com/arbitrum/bc0fb296415993c1eccfc983e9b8f4881272efa66f8f92fa916ea053b2bb768c"
+        evm:
+          chainId: 42161
+        routing:
+          scoreMultipliers:
+            - overall: 10
+        rateLimitBudget: high
+        group: fallback
+
+    # ── Aggressive defaults: fast response, don't care about extra calls ──
+    networkDefaults:
+      failsafe:
+        - matchMethod: "*"
+          timeout:
+            duration: 30s
+          retry:
+            maxAttempts: 10
+            delay: 0ms
+          hedge:
+            delay: 100ms
+            maxCount: 3
+
+    networks:
+      - architecture: evm
+        evm:
+          chainId: 1
+        alias: ethereum
+
+      - architecture: evm
+        evm:
+          chainId: 8453
+        alias: base
+
+      - architecture: evm
+        evm:
+          chainId: 42161
+        alias: arbitrum
+
+      - architecture: evm
+        evm:
+          chainId: 11155111
+        alias: ethereum_sepolia
+
+      - architecture: evm
+        evm:
+          chainId: 84532
+        alias: base_sepolia
+
+      - architecture: evm
+        evm:
+          chainId: 421614
+        alias: arbitrum_sepolia
+
+      - architecture: evm
+        evm:
+          chainId: 10143
+        alias: monad_testnet
+
+      - architecture: evm
+        evm:
+          chainId: 97
+        alias: bnbchain_testnet
+
+      - architecture: evm
+        evm:
+          chainId: 5115
+        alias: citrea_testnet
+        failsafe:
+          - matchMethod: "*"
+            timeout:
+              duration: 30s
+            retry:
+              maxAttempts: 5
+              delay: 0ms
+            hedge:
+              delay: 100ms
+              maxCount: 1
+
+      - architecture: evm
+        evm:
+          chainId: 8150
+        alias: alpen_testnet
+        failsafe:
+          - matchMethod: "*"
+            timeout:
+              duration: 30s
+            retry:
+              maxAttempts: 5
+              delay: 0ms
+            hedge:
+              delay: 100ms
+              maxCount: 1
+
+      - architecture: evm
+        evm:
+          chainId: 998
+        alias: hyperevm_testnet
+        failsafe:
+          - matchMethod: "*"
+            timeout:
+              duration: 30s
+            retry:
+              maxAttempts: 5
+              delay: 0ms
+            hedge:
+              delay: 100ms
+              maxCount: 2
+
+rateLimiters:
+  budgets:
+    - id: high
+      rules:
+        - method: "*"
+          maxCount: 100
+          period: 1s
+
+database:
+  evmJsonRpcCache:
+    connectors:
+      - id: memory-cache
+        driver: memory
+        memory:
+          maxItems: 50000
+    policies:
+      - network: "*"
+        method: "*"
+        finality: finalized
+        connector: memory-cache
+        ttl: 86400s
+        maxItemSize: 512KB
+      - network: "*"
+        method: "*"
+        finality: unfinalized
+        connector: memory-cache
+        ttl: 2s
+        maxItemSize: 256KB
+      - network: "*"
+        method: "*"
+        finality: unknown
+        connector: memory-cache
+        ttl: 5s
+        maxItemSize: 256KB

@@ -285,10 +285,7 @@ impl ChainPool {
             .map(|&(idx, _)| (idx, self.endpoints[idx].url.as_str()))
     }
 
-    fn least_recently_failed(
-        &self,
-        exclude: Option<usize>,
-    ) -> Option<(usize, &str)> {
+    fn least_recently_failed(&self, exclude: Option<usize>) -> Option<(usize, &str)> {
         let mut best: Option<usize> = None;
         for i in 0..self.endpoints.len() {
             if Some(i) == exclude {

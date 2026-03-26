@@ -1,0 +1,475 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+dashboard_secret = "hashira-dashboard-mainnet"
+
+# ─── Ethereum Mainnet (chainId: 1) ───
+[[chains]]
+name = "ethereum"
+route = "/ethereum"
+chain_id = 1
+rotation = "latency"
+endpoints = [
+  "https://eth.llamarpc.com",
+  "https://ethereum-rpc.publicnode.com",
+  "https://1rpc.io/eth",
+  "https://rpc.mevblocker.io",
+  "https://rpc.flashbots.net",
+  "https://rpc.flashbots.net/fast",
+  "https://eth.meowrpc.com",
+  "https://eth.drpc.org",
+  "https://eth.merkle.io",
+  "https://rpc.lokibuilder.xyz/wallet",
+  "https://ethereum.rpc.subquery.network/public",
+  "https://eth.blockrazor.xyz",
+  "https://endpoints.omniatech.io/v1/eth/mainnet/public",
+  "https://0xrpc.io/eth",
+  "https://ethereum-json-rpc.stakely.io",
+  "https://ethereum.publicnode.com",
+  "https://ethereum.public.blockpi.network/v1/rpc/public",
+  "https://cloudflare-eth.com/v1/mainnet",
+  "https://ethereum-public.nodies.app",
+  "https://eth.api.onfinality.io/public",
+  "https://ethereum-rpc.polkachu.com",
+  "https://eth-mainnet.reddio.com",
+  "https://mainnet.gateway.tenderly.co",
+  "https://ethereum.rpc.thirdweb.com",
+  "https://rpc.builder0x69.io",
+  "https://eth-protect.rpc.blxrbdn.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Base Mainnet (chainId: 8453) ───
+[[chains]]
+name = "base"
+route = "/base"
+chain_id = 8453
+rotation = "latency"
+endpoints = [
+  "https://mainnet.base.org",
+  "https://base.llamarpc.com",
+  "https://1rpc.io/base",
+  "https://base-rpc.publicnode.com",
+  "https://base-mainnet.public.blastapi.io",
+  "https://base-public.nodies.app",
+  "https://base.drpc.org",
+  "https://base.public.blockpi.network/v1/rpc/public",
+  "https://base.meowrpc.com",
+  "https://base.gateway.tenderly.co",
+  "https://gateway.tenderly.co/public/base",
+  "https://rpc.notadegen.com/base",
+  "https://base.api.onfinality.io/public",
+  "https://public.stackup.sh/api/v1/node/base-mainnet",
+  "https://base.rpc.subquery.network/public",
+  "https://endpoints.omniatech.io/v1/base/mainnet/public",
+  "https://base.lava.build",
+  "https://base.rpc.blxrbdn.com",
+  "https://base-rpc.polkachu.com",
+  "https://base.rpc.thirdweb.com",
+  "https://base-mainnet.gateway.tatum.io",
+  "https://developer-access-mainnet.base.org",
+  "https://base-mainnet.diamondswap.org/rpc",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Arbitrum One (chainId: 42161) ───
+[[chains]]
+name = "arbitrum"
+route = "/arbitrum"
+chain_id = 42161
+rotation = "latency"
+endpoints = [
+  "https://arb1.arbitrum.io/rpc",
+  "https://1rpc.io/arb",
+  "https://arbitrum-one-public.nodies.app",
+  "https://arbitrum.public.blockpi.network/v1/rpc/public",
+  "https://arbitrum-one.public.blastapi.io",
+  "https://arb-mainnet-public.unifra.io",
+  "https://arbitrum-one-rpc.publicnode.com",
+  "https://arbitrum.meowrpc.com",
+  "https://arbitrum.drpc.org",
+  "https://arbitrum.rpc.subquery.network/public",
+  "https://endpoints.omniatech.io/v1/arbitrum/one/public",
+  "https://arbitrum.lava.build",
+  "https://arbitrum.api.onfinality.io/public",
+  "https://arbitrum.gateway.tenderly.co",
+  "https://arbitrum.rpc.thirdweb.com",
+  "https://public-arb-mainnet.fastnode.io",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── HyperEVM / Hyperliquid (chainId: 999) ───
+[[chains]]
+name = "hyperevm"
+route = "/hyperevm"
+chain_id = 999
+rotation = "latency"
+endpoints = [
+  "https://rpc.hyperliquid.xyz/evm",
+  "https://rpc.hypurrscan.io",
+  "https://hyperliquid-json-rpc.stakely.io",
+  "https://hyperliquid.drpc.org",
+  "https://rpc.hyperlend.finance",
+  "https://hyperliquid.api.onfinality.io/evm/public",
+  "https://hyperliquid.rpc.blxrbdn.com",
+  "https://rpc.countzero.xyz/evm",
+  "https://1rpc.io/hyperliquid",
+  "https://hyperevm-mainnet.gateway.tatum.io",
+  "https://999.rpc.thirdweb.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── MegaETH Mainnet (chainId: 4326) ───
+[[chains]]
+name = "megaeth"
+route = "/megaeth"
+chain_id = 4326
+rotation = "latency"
+endpoints = [
+  "https://mainnet.megaeth.com/rpc",
+  "https://megaeth.drpc.org",
+  "https://rpc-megaeth-mainnet.globalstake.io",
+  "https://megaeth.gateway.tenderly.co",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 3
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Monad Mainnet (chainId: 143) ───
+[[chains]]
+name = "monad"
+route = "/monad"
+chain_id = 143
+rotation = "latency"
+endpoints = [
+  "https://rpc.monad.xyz",
+  "https://rpc1.monad.xyz",
+  "https://rpc2.monad.xyz",
+  "https://rpc3.monad.xyz",
+  "https://rpc4.monad.xyz",
+  "https://monad-mainnet.drpc.org",
+  "https://monad-mainnet.api.onfinality.io/public",
+  "https://monad-mainnet-rpc.spidernode.net",
+  "https://monad-mainnet.gateway.tatum.io",
+  "https://monad-rpc.huginn.tech",
+  "https://rpc-mainnet.monadinfra.com",
+  "https://monad.rpc.blxrbdn.com",
+  "https://monad.gateway.tenderly.co",
+  "https://143.rpc.thirdweb.com",
+  "https://infra.originstake.com/monad/evm",
+  "https://rpc.sentio.xyz/monad-mainnet",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── BNB Chain / BSC Mainnet (chainId: 56) ───
+[[chains]]
+name = "bnbchain"
+route = "/bnbchain"
+chain_id = 56
+rotation = "latency"
+endpoints = [
+  "https://binance.llamarpc.com",
+  "https://bsc-dataseed.bnbchain.org",
+  "https://bsc-dataseed1.bnbchain.org",
+  "https://bsc-dataseed2.bnbchain.org",
+  "https://bsc-dataseed3.bnbchain.org",
+  "https://bsc-dataseed4.bnbchain.org",
+  "https://bsc-dataseed1.defibit.io",
+  "https://bsc-dataseed2.defibit.io",
+  "https://bsc-dataseed3.defibit.io",
+  "https://bsc-dataseed4.defibit.io",
+  "https://bsc-dataseed1.ninicoin.io",
+  "https://bsc-dataseed2.ninicoin.io",
+  "https://bsc-dataseed3.ninicoin.io",
+  "https://bsc-dataseed4.ninicoin.io",
+  "https://1rpc.io/bnb",
+  "https://bsc-rpc.publicnode.com",
+  "https://bsc.meowrpc.com",
+  "https://bsc.drpc.org",
+  "https://bnb.rpc.subquery.network/public",
+  "https://bsc.blockrazor.xyz",
+  "https://endpoints.omniatech.io/v1/bsc/mainnet/public",
+  "https://bsc-mainnet.public.blastapi.io",
+  "https://bsc.rpc.blxrbdn.com",
+  "https://public-bsc-mainnet.fastnode.io",
+  "https://bsc.merkle.io",
+  "https://binance-smart-chain-public.nodies.app",
+  "https://binance.rpc.thirdweb.com",
+  "https://rpc-bsc.48.club",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Botanix Mainnet (chainId: 3637) ───
+[[chains]]
+name = "botanix"
+route = "/botanix"
+chain_id = 3637
+rotation = "latency"
+endpoints = [
+  "https://rpc.botanixlabs.com",
+  "https://rpc.ankr.com/botanix_mainnet",
+  "https://3637.rpc.thirdweb.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 3
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 2
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Citrea Mainnet (chainId: 4114) ───
+[[chains]]
+name = "citrea"
+route = "/citrea"
+chain_id = 4114
+endpoints = [
+  "https://rpc.mainnet.citrea.xyz",
+  "https://4114.rpc.thirdweb.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 3
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Solana Mainnet ───
+[[chains]]
+name = "solana"
+route = "/solana"
+rotation = "latency"
+endpoints = [
+  "https://api.mainnet-beta.solana.com",
+  "https://solana-rpc.publicnode.com",
+  "https://solana.drpc.org",
+  "https://solana.api.onfinality.io/public",
+  "https://solana.rpc.subquery.network/public",
+  "https://public.rpc.solanavibestation.com",
+  "https://sol-protect.rpc.blxrbdn.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_method = "getSlot"
+health_check_interval_seconds = 10
+max_block_lag = 50
+max_retries = 5
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "solana"
+max_capacity = 50000
+
+# ─── Starknet Mainnet ───
+[[chains]]
+name = "starknet"
+route = "/starknet"
+rotation = "latency"
+endpoints = [
+  "https://1rpc.io/starknet",
+  "https://starknet-rpc.publicnode.com",
+  "https://starknet.drpc.org",
+  "https://rpc.starknet.lava.build",
+  "https://endpoints.omniatech.io/v1/starknet/mainnet/public",
+  "https://starknet.api.onfinality.io/public",
+  "https://starknet-mainnet.reddio.com/rpc/v0_7",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_method = "starknet_blockNumber"
+health_check_interval_seconds = 10
+max_block_lag = 10
+max_retries = 5
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+max_capacity = 50000

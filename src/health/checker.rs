@@ -98,8 +98,7 @@ async fn fetch_block_heights(
             let auth = endpoint.auth.clone();
             async move {
                 let start = std::time::Instant::now();
-                let height =
-                    fetch_block_height(&client, &url, &method, auth.as_ref()).await;
+                let height = fetch_block_height(&client, &url, &method, auth.as_ref()).await;
                 let latency_ms = start.elapsed().as_millis() as u64;
                 (idx, height, latency_ms)
             }

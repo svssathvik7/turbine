@@ -1,13 +1,13 @@
 use super::{
     auth_middleware, proxy_handler, ws_proxy_handler, AppState, AuthEntry, ChainState, Forwarder,
 };
-use axum::extract::{FromRequest, Path};
 use crate::cache::ChainCache;
 use crate::config::Config;
 use crate::dashboard::DASHBOARD_HTML;
 use crate::health::{spawn_health_checker, ChainPool, EndpointStatus};
 use crate::metrics::{ChainMetrics, ChainMetricsSnapshot};
 use axum::extract::State;
+use axum::extract::{FromRequest, Path};
 use axum::middleware;
 use axum::response::{Html, Json};
 use axum::routing::{get, post};
