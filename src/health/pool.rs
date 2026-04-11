@@ -75,7 +75,7 @@ impl ChainPool {
                     if exclude.contains(&idx) {
                         continue;
                     }
-                    if self.health[idx].is_healthy() {
+                    if self.health[idx].is_available() {
                         return Some((idx, &self.endpoints[idx].url));
                     }
                 }
@@ -148,7 +148,7 @@ impl ChainPool {
 
         for i in 0..len {
             let idx = (start + i) % len;
-            if self.health[idx].is_healthy() {
+            if self.health[idx].is_available() {
                 return Some((idx, &self.endpoints[idx].url));
             }
         }
@@ -165,7 +165,7 @@ impl ChainPool {
             if idx == exclude {
                 continue;
             }
-            if self.health[idx].is_healthy() {
+            if self.health[idx].is_available() {
                 return Some((idx, &self.endpoints[idx].url));
             }
         }
@@ -239,7 +239,7 @@ impl ChainPool {
     fn next_latency_based(&self, candidates: &[usize], exclude: &[usize]) -> Option<(usize, &str)> {
         let mut effective: Vec<(usize, f64)> = Vec::new();
         for &idx in candidates {
-            if exclude.contains(&idx) || !self.health[idx].is_healthy() {
+            if exclude.contains(&idx) || !self.health[idx].is_available() {
                 continue;
             }
             let user_w = self.endpoints[idx].weight as f64;
@@ -354,7 +354,7 @@ impl ChainPool {
                     if exclude.contains(&idx) {
                         continue;
                     }
-                    if self.health[idx].is_healthy() {
+                    if self.health[idx].is_available() {
                         return Some((idx, &self.endpoints[idx].url));
                     }
                 }
@@ -404,7 +404,7 @@ impl ChainPool {
                 let target = tick % healthy_weight;
                 let mut cumulative = 0u32;
                 for &idx in eligible {
-                    if exclude.contains(&idx) || !self.health[idx].is_healthy() {
+                    if exclude.contains(&idx) || !self.health[idx].is_available() {
                         continue;
                     }
                     cumulative += self.endpoints[idx].weight;
@@ -423,15 +423,23 @@ impl ChainPool {
     }
 
     pub fn record_failure(&self, idx: usize) {
-        self.health[idx].record_failure(self.health_config.max_consecutive_failures);
+        self.health[idx].record_failure(
+            self.health_config.max_consecutive_failures,
+            self.health_config.cooldown_seconds,
+        );
+    }
+
+    /// Record an upstream 429 throttle — does NOT count as a hard failure.
+    pub fn record_throttle(&self, idx: usize) {
+        self.health[idx].record_throttle();
     }
 
     pub fn mark_stale(&self, idx: usize) {
-        self.health[idx].mark_unhealthy();
+        self.health[idx].mark_unhealthy_with_cooldown(self.health_config.cooldown_seconds);
     }
 
     pub fn healthy_count(&self) -> usize {
-        self.health.iter().filter(|h| h.is_healthy()).count()
+        self.health.iter().filter(|h| h.is_available()).count()
     }
 
     pub fn total_weight(&self) -> u32 {
@@ -469,6 +477,7 @@ impl ChainPool {
                     url: redact_url(&ep.url),
                     weight: ep.weight,
                     is_healthy: snap.is_healthy,
+                    is_throttled: snap.is_throttled,
                     consecutive_failures: snap.consecutive_failures,
                     block_height: snap.block_height,
                     last_latency_ms: snap.last_latency_ms,
@@ -476,6 +485,7 @@ impl ChainPool {
                     request_count: snap.request_count,
                     success_count: snap.success_count,
                     failure_count: snap.failure_count,
+                    throttle_count: snap.throttle_count,
                 }
             })
             .collect()

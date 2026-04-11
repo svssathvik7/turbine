@@ -361,7 +361,7 @@ async fn forward_with_retry(
     method: &str,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let max_retries = chain_state.pool.health_config.max_retries;
-    let retry_delay_ms = chain_state.pool.health_config.retry_delay_ms;
+    let base_retry_delay_ms = chain_state.pool.health_config.retry_delay_ms;
     let total_attempts = max_retries + 1;
     let mut excluded: Vec<usize> = Vec::new();
     let mut last_error = String::new();
@@ -378,41 +378,55 @@ async fn forward_with_retry(
     }
 
     for attempt in 0..total_attempts {
-        if attempt > 0 && retry_delay_ms > 0 {
-            tokio::time::sleep(Duration::from_millis(retry_delay_ms)).await;
+        // Exponential backoff: base_delay * 2^(attempt-1), min 100ms on retry
+        if attempt > 0 {
+            let delay = if base_retry_delay_ms > 0 {
+                base_retry_delay_ms * (1u64 << (attempt - 1).min(4))
+            } else {
+                100 * (1u64 << (attempt - 1).min(4))
+            };
+            tokio::time::sleep(Duration::from_millis(delay)).await;
         }
 
-        // Hedged first attempt
+        // Hedged first attempt — but only if enough endpoints are healthy.
+        // Suppress hedging when the pool is degraded (< half healthy) to
+        // avoid amplifying load on already-stressed endpoints.
         if attempt == 0 {
             if let Some(ref hedge_config) = chain_state.pool.hedge_config {
-                match forward_with_hedging(
-                    chain_state,
-                    body,
-                    chain,
-                    request_count,
-                    hedge_config,
-                    &eligible,
-                )
-                .await
-                {
-                    HedgeOutcome::Success(status, json) => return (status, json),
-                    HedgeOutcome::AllFailed {
-                        last_err,
-                        failed_indices,
-                    } => {
-                        last_error = last_err;
-                        excluded.extend(failed_indices);
-                        continue;
-                    }
-                    HedgeOutcome::NoEndpoints => {
-                        chain_state.metrics.record_failures(request_count);
-                        error!(chain = %chain, "All endpoints are unhealthy");
-                        let resp =
-                            JsonRpcResponse::proxy_error("All endpoints are unhealthy".to_string());
-                        return (
-                            StatusCode::SERVICE_UNAVAILABLE,
-                            Json(serde_json::to_value(resp).unwrap()),
-                        );
+                let healthy = chain_state.pool.healthy_count();
+                let total = chain_state.pool.endpoints.len();
+                let should_hedge = healthy > total / 2;
+                if should_hedge {
+                    match forward_with_hedging(
+                        chain_state,
+                        body,
+                        chain,
+                        request_count,
+                        hedge_config,
+                        &eligible,
+                    )
+                    .await
+                    {
+                        HedgeOutcome::Success(status, json) => return (status, json),
+                        HedgeOutcome::AllFailed {
+                            last_err,
+                            failed_indices,
+                        } => {
+                            last_error = last_err;
+                            excluded.extend(failed_indices);
+                            continue;
+                        }
+                        HedgeOutcome::NoEndpoints => {
+                            chain_state.metrics.record_failures(request_count);
+                            error!(chain = %chain, "All endpoints are unhealthy");
+                            let resp = JsonRpcResponse::proxy_error(
+                                "All endpoints are unhealthy".to_string(),
+                            );
+                            return (
+                                StatusCode::SERVICE_UNAVAILABLE,
+                                Json(serde_json::to_value(resp).unwrap()),
+                            );
+                        }
                     }
                 }
             }
@@ -455,6 +469,14 @@ async fn forward_with_retry(
                         .unwrap()
                     });
                 return (StatusCode::OK, Json(value));
+            }
+            Err(crate::proxy::ForwardError::RateLimited) => {
+                // 429 — record throttle (not a hard failure), exclude and retry
+                chain_state.pool.record_throttle(idx);
+                chain_state.metrics.record_upstream_throttled();
+                last_error = "Rate limited (429)".to_string();
+                warn!(chain = %chain, endpoint = %endpoint_url, attempt = attempt + 1, "Upstream rate limited, trying next");
+                excluded.push(idx);
             }
             Err(e) => {
                 last_error = e.to_string();
@@ -544,8 +566,13 @@ async fn forward_with_hedging(
                             chain_state.metrics.record_successes(request_count);
                             return HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)));
                         }
-                        Err(e) => {
-                            chain_state.pool.record_failure(idx);
+                        Err(ref e) => {
+                            if matches!(e, crate::proxy::ForwardError::RateLimited) {
+                                chain_state.pool.record_throttle(idx);
+                                chain_state.metrics.record_upstream_throttled();
+                            } else {
+                                chain_state.pool.record_failure(idx);
+                            }
                             failed_indices.push(idx);
                             warn!(chain = %chain, error = %e, "Hedged request failed");
                             // If no more in-flight and can't hedge more, give up
@@ -601,8 +628,13 @@ async fn forward_with_hedging(
                         chain_state.metrics.record_successes(request_count);
                         return HedgeOutcome::Success(StatusCode::OK, Json(parse_bytes(bytes)));
                     }
-                    Err(e) => {
-                        chain_state.pool.record_failure(idx);
+                    Err(ref e) => {
+                        if matches!(e, crate::proxy::ForwardError::RateLimited) {
+                            chain_state.pool.record_throttle(idx);
+                            chain_state.metrics.record_upstream_throttled();
+                        } else {
+                            chain_state.pool.record_failure(idx);
+                        }
                         failed_indices.push(idx);
                         warn!(chain = %chain, error = %e, "Hedged request failed");
                         if in_flight.is_empty() {

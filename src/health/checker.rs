@@ -4,7 +4,17 @@ use futures_util::future::join_all;
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
+
+/// Result of a single health check request.
+enum HealthCheckResult {
+    /// Successful — got a block height.
+    Ok(u64),
+    /// Upstream returned 429 — rate limited, not a failure.
+    Throttled,
+    /// Request failed (timeout, connection error, bad response, etc.)
+    Failed,
+}
 
 /// Spawns a background task that periodically checks endpoint health
 /// by calling the configured JSON-RPC method and comparing block heights.
@@ -28,15 +38,18 @@ pub fn spawn_health_checker(
         loop {
             interval.tick().await;
 
-            let block_heights = fetch_block_heights(&client, &pool, &method).await;
+            let results = fetch_block_heights(&client, &pool, &method).await;
 
-            if block_heights.is_empty() {
+            if results.is_empty() {
                 continue;
             }
 
-            let max_height = block_heights
+            let max_height = results
                 .iter()
-                .filter_map(|(_, h)| *h)
+                .filter_map(|(_, r)| match r {
+                    HealthCheckResult::Ok(h) => Some(*h),
+                    _ => None,
+                })
                 .max()
                 .unwrap_or(0);
 
@@ -44,9 +57,9 @@ pub fn spawn_health_checker(
                 continue;
             }
 
-            for (idx, height) in &block_heights {
-                match height {
-                    Some(h) if max_height - h > max_block_lag => {
+            for (idx, result) in &results {
+                match result {
+                    HealthCheckResult::Ok(h) if max_height - h > max_block_lag => {
                         warn!(
                             chain = %chain_name,
                             endpoint = %pool.endpoints[*idx].url,
@@ -58,23 +71,38 @@ pub fn spawn_health_checker(
                         pool.update_block_height(*idx, *h);
                         pool.mark_stale(*idx);
                     }
-                    Some(h) => {
-                        debug!(
-                            chain = %chain_name,
-                            endpoint = %pool.endpoints[*idx].url,
-                            block_height = h,
-                            "Endpoint healthy"
-                        );
+                    HealthCheckResult::Ok(h) => {
                         pool.update_block_height(*idx, *h);
-                        // If it was previously stale but now caught up, re-enable it
+                        // Re-enable if previously stale/unhealthy
+                        if !pool.health[*idx].is_healthy() {
+                            info!(
+                                chain = %chain_name,
+                                endpoint = %pool.endpoints[*idx].url,
+                                block_height = h,
+                                "Endpoint recovered, marking healthy"
+                            );
+                        }
                         pool.record_success(*idx);
                     }
-                    None => {
+                    HealthCheckResult::Throttled => {
+                        // Endpoint is alive but rate-limiting us — record throttle
+                        // (does not increment consecutive failures)
                         debug!(
                             chain = %chain_name,
                             endpoint = %pool.endpoints[*idx].url,
-                            "Health check failed, passive tracking will handle"
+                            "Health check throttled (429), endpoint is alive but rate-limiting"
                         );
+                        pool.record_throttle(*idx);
+                    }
+                    HealthCheckResult::Failed => {
+                        debug!(
+                            chain = %chain_name,
+                            endpoint = %pool.endpoints[*idx].url,
+                            "Health check failed"
+                        );
+                        // Don't record_failure here — passive request tracking handles it.
+                        // The health checker's job is to detect stale blocks and recover
+                        // endpoints, not to pile on failures during transient issues.
                     }
                 }
             }
@@ -86,7 +114,7 @@ async fn fetch_block_heights(
     client: &Client,
     pool: &ChainPool,
     method: &str,
-) -> Vec<(usize, Option<u64>)> {
+) -> Vec<(usize, HealthCheckResult)> {
     let futures: Vec<_> = pool
         .endpoints
         .iter()
@@ -98,9 +126,9 @@ async fn fetch_block_heights(
             let auth = endpoint.auth.clone();
             async move {
                 let start = std::time::Instant::now();
-                let height = fetch_block_height(&client, &url, &method, auth.as_ref()).await;
+                let result = fetch_block_height(&client, &url, &method, auth.as_ref()).await;
                 let latency_ms = start.elapsed().as_millis() as u64;
-                (idx, height, latency_ms)
+                (idx, result, latency_ms)
             }
         })
         .collect();
@@ -109,11 +137,11 @@ async fn fetch_block_heights(
 
     results
         .into_iter()
-        .map(|(idx, height, latency_ms)| {
-            if height.is_some() {
+        .map(|(idx, result, latency_ms)| {
+            if let HealthCheckResult::Ok(_) = &result {
                 pool.update_latency(idx, latency_ms);
             }
-            (idx, height)
+            (idx, result)
         })
         .collect()
 }
@@ -123,7 +151,7 @@ async fn fetch_block_height(
     endpoint: &str,
     method: &str,
     auth: Option<&EndpointAuth>,
-) -> Option<u64> {
+) -> HealthCheckResult {
     let body = serde_json::json!({
         "jsonrpc": "2.0",
         "method": method,
@@ -144,22 +172,43 @@ async fn fetch_block_height(
         };
     }
 
-    let response = req.send().await.ok()?;
+    let response = match req.send().await {
+        Ok(r) => r,
+        Err(_) => return HealthCheckResult::Failed,
+    };
 
-    let json: serde_json::Value = response.json().await.ok()?;
+    // Detect upstream rate limiting
+    if response.status().as_u16() == 429 {
+        return HealthCheckResult::Throttled;
+    }
 
-    let result = json.get("result")?;
+    if !response.status().is_success() {
+        return HealthCheckResult::Failed;
+    }
+
+    let json: serde_json::Value = match response.json().await {
+        Ok(j) => j,
+        Err(_) => return HealthCheckResult::Failed,
+    };
+
+    let result = match json.get("result") {
+        Some(r) => r,
+        None => return HealthCheckResult::Failed,
+    };
 
     // Handle hex string (EVM: "0x1a2b3c")
     if let Some(hex_str) = result.as_str() {
         let hex_str = hex_str.trim_start_matches("0x");
-        return u64::from_str_radix(hex_str, 16).ok();
+        return match u64::from_str_radix(hex_str, 16) {
+            Ok(h) => HealthCheckResult::Ok(h),
+            Err(_) => HealthCheckResult::Failed,
+        };
     }
 
     // Handle plain number (Solana: 123456789)
     if let Some(num) = result.as_u64() {
-        return Some(num);
+        return HealthCheckResult::Ok(num);
     }
 
-    None
+    HealthCheckResult::Failed
 }
