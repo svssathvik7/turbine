@@ -30,6 +30,8 @@ pub fn spawn_health_checker(
     tokio::spawn(async move {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
+            .pool_max_idle_per_host(2)
+            .pool_idle_timeout(Duration::from_secs(15))
             .build()
             .expect("Failed to build health check client");
 

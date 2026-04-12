@@ -26,9 +26,9 @@ impl Forwarder {
     fn build_client() -> Client {
         Client::builder()
             .timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(20)
-            .pool_idle_timeout(Duration::from_secs(90))
-            .tcp_keepalive(Duration::from_secs(60))
+            .pool_max_idle_per_host(4)
+            .pool_idle_timeout(Duration::from_secs(10))
+            .tcp_keepalive(Duration::from_secs(30))
             .build()
             .expect("Failed to build HTTP client")
     }
