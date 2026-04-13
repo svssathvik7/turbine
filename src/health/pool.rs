@@ -2,11 +2,12 @@ use super::state::EndpointStatus;
 use super::state::RosterStatus;
 use super::EndpointHealth;
 use crate::config::{ChainConfig, EndpointConfig, HealthConfig, HedgeConfig, RotationStrategy};
+use arc_swap::ArcSwap;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct ChainPool {
@@ -21,7 +22,8 @@ pub struct ChainPool {
     /// Precomputed total weight for weighted rotation.
     total_weight: u32,
     /// Indices of endpoints currently receiving traffic and health checks.
-    pub active_indices: RwLock<Vec<usize>>,
+    /// Uses ArcSwap for lock-free reads on the hot path (every request).
+    pub active_indices: ArcSwap<Vec<usize>>,
     /// Reserve queue — FIFO. Front = next promotion candidate.
     pub rpc_house: Mutex<VecDeque<usize>>,
 }
@@ -56,14 +58,14 @@ impl ChainPool {
             chain_id: config.chain_id,
             hedge_config: config.hedge.clone(),
             total_weight,
-            active_indices: RwLock::new(active_indices),
+            active_indices: ArcSwap::from_pointee(active_indices),
             rpc_house: Mutex::new(rpc_house),
         }
     }
 
     /// Select the next healthy endpoint based on rotation strategy.
     pub fn next_endpoint(&self) -> Option<(usize, &str)> {
-        let active = self.active_indices.read().unwrap();
+        let active = self.active_indices.load();
         match self.rotation {
             RotationStrategy::RoundRobin | RotationStrategy::Weighted => {
                 self.next_endpoint_from_eligible(&active, &[])
@@ -74,7 +76,7 @@ impl ChainPool {
 
     /// Select the next healthy endpoint excluding a specific index.
     pub fn next_endpoint_excluding(&self, exclude: usize) -> Option<(usize, &str)> {
-        let active = self.active_indices.read().unwrap();
+        let active = self.active_indices.load();
         match self.rotation {
             RotationStrategy::RoundRobin | RotationStrategy::Weighted => {
                 self.next_endpoint_from_eligible(&active, &[exclude])
@@ -85,7 +87,7 @@ impl ChainPool {
 
     /// Select the next healthy endpoint excluding multiple indices.
     pub fn next_endpoint_excluding_many(&self, exclude: &[usize]) -> Option<(usize, &str)> {
-        let active = self.active_indices.read().unwrap();
+        let active = self.active_indices.load();
         match self.rotation {
             RotationStrategy::RoundRobin | RotationStrategy::Weighted => {
                 self.next_endpoint_from_eligible(&active, exclude)
@@ -150,7 +152,7 @@ impl ChainPool {
     /// - If any endpoint declares `methods` containing `method`, return only those indices.
     /// - Otherwise, return indices of endpoints with no `methods` restriction (unconstrained).
     pub fn eligible_indices_for_method(&self, method: &str) -> Vec<usize> {
-        let active = self.active_indices.read().unwrap();
+        let active = self.active_indices.load();
 
         let claimed: Vec<usize> = self
             .endpoints
@@ -285,7 +287,7 @@ impl ChainPool {
     }
 
     pub fn healthy_count(&self) -> usize {
-        let active = self.active_indices.read().unwrap();
+        let active = self.active_indices.load();
         active.iter().filter(|&&i| self.health[i].is_available()).count()
     }
 
@@ -310,12 +312,15 @@ impl ChainPool {
     /// If rpc_house is empty (after pushing the demoted endpoint), recycles
     /// all non-active indices back into the queue.
     pub fn demote_and_replace(&self, idx: usize) {
-        let mut active = self.active_indices.write().unwrap();
         let mut house = self.rpc_house.lock().unwrap();
 
+        // Load current active set
+        let current_active = self.active_indices.load();
+        let mut new_active: Vec<usize> = current_active.iter().copied().collect();
+
         // Remove from active set
-        if let Some(pos) = active.iter().position(|&i| i == idx) {
-            active.remove(pos);
+        if let Some(pos) = new_active.iter().position(|&i| i == idx) {
+            new_active.remove(pos);
         } else {
             return; // Not in active set, nothing to do
         }
@@ -326,7 +331,7 @@ impl ChainPool {
         // If rpc_house only contains the just-demoted endpoint, recycle
         if house.len() == 1 {
             let mut recyclable: Vec<usize> = (0..self.endpoints.len())
-                .filter(|i| !active.contains(i) && *i != idx)
+                .filter(|i| !new_active.contains(i) && *i != idx)
                 .collect();
             recyclable.shuffle(&mut thread_rng());
             for r in recyclable {
@@ -336,8 +341,11 @@ impl ChainPool {
 
         // Pop front as replacement (guaranteed != idx since idx is at back)
         if let Some(replacement) = house.pop_front() {
-            active.push(replacement);
+            new_active.push(replacement);
         }
+
+        // Atomically swap in the new active set
+        self.active_indices.store(Arc::new(new_active));
     }
 
     pub fn rotation_name(&self) -> &str {
@@ -349,7 +357,7 @@ impl ChainPool {
     }
 
     pub fn endpoint_statuses(&self) -> Vec<EndpointStatus> {
-        let active = self.active_indices.read().unwrap();
+        let active = self.active_indices.load();
         self.endpoints
             .iter()
             .enumerate()
@@ -577,7 +585,7 @@ mod tests {
             ep("https://c.com", None),
         ]);
         let pool = ChainPool::new(&config);
-        let active = pool.active_indices.read().unwrap();
+        let active = pool.active_indices.load();
         let house = pool.rpc_house.lock().unwrap();
         assert_eq!(active.len(), 3);
         assert!(house.is_empty());
@@ -596,7 +604,7 @@ mod tests {
             ep("https://h.com", None),
         ]);
         let pool = ChainPool::new(&config);
-        let active = pool.active_indices.read().unwrap();
+        let active = pool.active_indices.load();
         let house = pool.rpc_house.lock().unwrap();
         assert_eq!(active.len(), 5);
         assert_eq!(house.len(), 3);
@@ -619,7 +627,7 @@ mod tests {
             ep("https://g.com", None),
         ]);
         let pool = ChainPool::new(&config);
-        let active = pool.active_indices.read().unwrap().clone();
+        let active = pool.active_indices.load().clone();
 
         for _ in 0..50 {
             let (idx, _) = pool.next_endpoint().unwrap();
@@ -644,7 +652,7 @@ mod tests {
             ep("https://g.com", None),
         ]);
         let pool = ChainPool::new(&config);
-        let active = pool.active_indices.read().unwrap().clone();
+        let active = pool.active_indices.load().clone();
         let eligible = pool.eligible_indices_for_method("eth_call");
 
         for idx in &eligible {
@@ -685,12 +693,12 @@ mod tests {
             ep("https://g.com", None),
         ]);
         let pool = ChainPool::new(&config);
-        let active_before = pool.active_indices.read().unwrap().clone();
+        let active_before = pool.active_indices.load().clone();
         let demoted_idx = active_before[0];
 
         pool.demote_and_replace(demoted_idx);
 
-        let active_after = pool.active_indices.read().unwrap().clone();
+        let active_after = pool.active_indices.load().clone();
         assert_eq!(active_after.len(), 5);
         assert!(!active_after.contains(&demoted_idx));
         let house = pool.rpc_house.lock().unwrap();
@@ -711,14 +719,14 @@ mod tests {
         let pool = ChainPool::new(&config);
 
         // Demote once — uses the single reserve endpoint
-        let first_demoted = pool.active_indices.read().unwrap()[0];
+        let first_demoted = pool.active_indices.load()[0];
         pool.demote_and_replace(first_demoted);
 
         // Demote again — rpc_house only has first_demoted, triggers recycle
-        let second_demoted = pool.active_indices.read().unwrap()[0];
+        let second_demoted = pool.active_indices.load()[0];
         pool.demote_and_replace(second_demoted);
 
-        let active = pool.active_indices.read().unwrap().clone();
+        let active = pool.active_indices.load().clone();
         assert_eq!(active.len(), 5);
         assert!(!active.contains(&second_demoted));
     }
@@ -733,11 +741,11 @@ mod tests {
             ep("https://e.com", None),
         ]);
         let pool = ChainPool::new(&config);
-        let active_before = pool.active_indices.read().unwrap().clone();
+        let active_before = pool.active_indices.load().clone();
 
         pool.demote_and_replace(active_before[0]);
 
-        let active_after = pool.active_indices.read().unwrap().clone();
+        let active_after = pool.active_indices.load().clone();
         assert!(active_after.len() >= 4);
     }
 

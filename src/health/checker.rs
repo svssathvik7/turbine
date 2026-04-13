@@ -151,10 +151,11 @@ async fn fetch_block_heights(
     pool: &ChainPool,
     method: &str,
 ) -> Vec<(usize, HealthCheckResult)> {
-    let active = pool.active_indices.read().unwrap().clone();
+    let active_guard = pool.active_indices.load();
+    let active: &[usize] = &active_guard;
     let mut results = Vec::with_capacity(active.len());
 
-    for &idx in &active {
+    for &idx in active {
         let endpoint = &pool.endpoints[idx];
         let start = std::time::Instant::now();
         let result = fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
