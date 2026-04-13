@@ -2,7 +2,11 @@ use super::state::EndpointStatus;
 use super::state::RosterStatus;
 use super::EndpointHealth;
 use crate::config::{ChainConfig, EndpointConfig, HealthConfig, HedgeConfig, RotationStrategy};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, RwLock};
 
 #[derive(Debug)]
 pub struct ChainPool {
@@ -16,7 +20,13 @@ pub struct ChainPool {
     pub hedge_config: Option<HedgeConfig>,
     /// Precomputed total weight for weighted rotation.
     total_weight: u32,
+    /// Indices of endpoints currently receiving traffic and health checks.
+    pub active_indices: RwLock<Vec<usize>>,
+    /// Reserve queue — FIFO. Front = next promotion candidate.
+    pub rpc_house: Mutex<VecDeque<usize>>,
 }
+
+const ACTIVE_SET_SIZE: usize = 5;
 
 impl ChainPool {
     pub fn new(config: &ChainConfig) -> Self {
@@ -28,6 +38,14 @@ impl ChainPool {
 
         let total_weight: u32 = config.endpoints.iter().map(|e| e.weight).sum();
 
+        let num_endpoints = config.endpoints.len();
+        let mut all_indices: Vec<usize> = (0..num_endpoints).collect();
+        all_indices.shuffle(&mut thread_rng());
+
+        let active_size = ACTIVE_SET_SIZE.min(num_endpoints);
+        let active_indices: Vec<usize> = all_indices[..active_size].to_vec();
+        let rpc_house: VecDeque<usize> = all_indices[active_size..].iter().copied().collect();
+
         Self {
             name: config.name.clone(),
             endpoints: config.endpoints.clone(),
@@ -38,6 +56,8 @@ impl ChainPool {
             chain_id: config.chain_id,
             hedge_config: config.hedge.clone(),
             total_weight,
+            active_indices: RwLock::new(active_indices),
+            rpc_house: Mutex::new(rpc_house),
         }
     }
 
@@ -681,5 +701,43 @@ mod tests {
             "heavy={} should be > 60 out of 100",
             heavy_count
         );
+    }
+
+    #[test]
+    fn roster_initializes_all_active_when_5_or_fewer_endpoints() {
+        let config = make_config(vec![
+            ep("https://a.com", None),
+            ep("https://b.com", None),
+            ep("https://c.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let active = pool.active_indices.read().unwrap();
+        let house = pool.rpc_house.lock().unwrap();
+        assert_eq!(active.len(), 3);
+        assert!(house.is_empty());
+    }
+
+    #[test]
+    fn roster_splits_when_more_than_5_endpoints() {
+        let config = make_config(vec![
+            ep("https://a.com", None),
+            ep("https://b.com", None),
+            ep("https://c.com", None),
+            ep("https://d.com", None),
+            ep("https://e.com", None),
+            ep("https://f.com", None),
+            ep("https://g.com", None),
+            ep("https://h.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let active = pool.active_indices.read().unwrap();
+        let house = pool.rpc_house.lock().unwrap();
+        assert_eq!(active.len(), 5);
+        assert_eq!(house.len(), 3);
+        // All indices accounted for
+        let mut all: Vec<usize> = active.iter().copied().collect();
+        all.extend(house.iter());
+        all.sort();
+        assert_eq!(all, vec![0, 1, 2, 3, 4, 5, 6, 7]);
     }
 }
