@@ -150,7 +150,7 @@ pub struct HealthConfig {
 }
 
 fn default_health_check_interval() -> u64 {
-    30
+    300
 }
 
 fn default_max_block_lag() -> u64 {

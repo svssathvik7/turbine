@@ -1,0 +1,395 @@
+[server]
+host = "0.0.0.0"
+port = 8081
+dashboard_secret = "hashira-dashboard"
+
+# ─── Ethereum Sepolia (chainId: 11155111) ───
+[[chains]]
+name = "ethereum_sepolia"
+route = "/ethereum_sepolia"
+chain_id = 11155111
+rotation = "latency"
+endpoints = [
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://rpc.sepolia.org",
+  "https://rpc2.sepolia.org",
+  "https://rpc.sepolia.ethpandaops.io",
+  "https://eth-sepolia.public.blastapi.io",
+  "https://1rpc.io/sepolia",
+  "https://sepolia.gateway.tenderly.co",
+  "https://gateway.tenderly.co/public/sepolia",
+  "https://endpoints.omniatech.io/v1/eth/sepolia/public",
+  "https://sepolia.drpc.org",
+  "https://eth-sepolia-public.unifra.io",
+  "https://eth-sepolia.api.onfinality.io/public",
+  "https://public.stackup.sh/api/v1/node/ethereum-sepolia",
+  "https://ethereum-sepolia-public.nodies.app",
+  "https://api.zan.top/eth-sepolia",
+  "https://rpc.notadegen.com/eth/sepolia",
+  "https://ethereum-sepolia.blockpi.network/v1/rpc/public",
+  "https://ethereum-subquery.network/public",
+  "https://0xrpc.io/sep",
+  "https://ethereum-sepolia.therpc.io",
+  "https://ethereum-sepolia.gateway.tatum.io",
+  "https://rpc.sentio.xyz/sepolia",
+  "https://eth-sepolia.g.alchemy.com/v2/demo",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Base Sepolia (chainId: 84532) ───
+[[chains]]
+name = "base_sepolia"
+route = "/base_sepolia"
+chain_id = 84532
+rotation = "latency"
+endpoints = [
+  "https://sepolia.base.org",
+  "https://sepolia-preconf.base.org",
+  "https://base-sepolia-rpc.publicnode.com",
+  "https://base-sepolia.drpc.org",
+  "https://base-sepolia.gateway.tenderly.co",
+  "https://base-sepolia-public.nodies.app",
+  "https://base-sepolia.therpc.io",
+  "https://base-sepolia.api.onfinality.io/public",
+  "https://public.stackup.sh/api/v1/node/base-sepolia",
+  "https://rpc.notadegen.com/base/sepolia",
+  "https://rpc.sentio.xyz/base-sepolia",
+  "https://endpoints.omniatech.io/v1/base/sepolia/public",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Arbitrum Sepolia (chainId: 421614) ───
+[[chains]]
+name = "arbitrum_sepolia"
+route = "/arbitrum_sepolia"
+chain_id = 421614
+rotation = "latency"
+endpoints = [
+  "https://sepolia-rollup.arbitrum.io/rpc",
+  "https://arbitrum-sepolia-rpc.publicnode.com",
+  "https://arbitrum-sepolia.gateway.tenderly.co",
+  "https://arbitrum-sepolia.drpc.org",
+  "https://endpoints.omniatech.io/v1/arbitrum/sepolia/public",
+  "https://arbitrum-sepolia.api.onfinality.io/public",
+  "https://arbitrum-sepolia.therpc.io",
+  "https://public.stackup.sh/api/v1/node/arbitrum-sepolia",
+  "https://api.zan.top/arb-sepolia",
+  "https://arbitrum-one-sepolia.gateway.tatum.io",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Citrea Testnet (chainId: 5115) ───
+[[chains]]
+name = "citrea_testnet"
+route = "/citrea_testnet"
+chain_id = 5115
+rotation = "latency"
+endpoints = [
+  "https://rpc.testnet.citrea.xyz",
+  "https://5115.rpc.thirdweb.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 3
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Monad Testnet (chainId: 10143) ───
+[[chains]]
+name = "monad_testnet"
+route = "/monad_testnet"
+chain_id = 10143
+rotation = "latency"
+endpoints = [
+  "https://testnet-rpc.monad.xyz",
+  "https://rpc-testnet.monadinfra.com",
+  "https://monad-testnet.drpc.org",
+  "https://rpc.ankr.com/monad_testnet",
+  "https://monad-testnet.gateway.tatum.io",
+  "https://monad-testnet.api.onfinality.io/public",
+  "https://monad-testnet-rpc.huginn.tech",
+  "https://monad-testnet.gateway.tenderly.co",
+  "https://10143.rpc.thirdweb.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── BNBChain Testnet (chainId: 97) ───
+[[chains]]
+name = "bnbchain_testnet"
+route = "/bnbchain_testnet"
+chain_id = 97
+rotation = "latency"
+endpoints = [
+  "https://bsc-testnet-dataseed.bnbchain.org",
+  "https://bsc-testnet.bnbchain.org",
+  "https://bsc-prebsc-dataseed.bnbchain.org",
+  "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+  "https://data-seed-prebsc-2-s1.bnbchain.org:8545",
+  "https://data-seed-prebsc-1-s2.bnbchain.org:8545",
+  "https://data-seed-prebsc-2-s2.bnbchain.org:8545",
+  "https://data-seed-prebsc-1-s3.bnbchain.org:8545",
+  "https://data-seed-prebsc-2-s3.bnbchain.org:8545",
+  "https://bsc-testnet.public.blastapi.io",
+  "https://bsc-testnet-rpc.publicnode.com",
+  "https://bsc-testnet.drpc.org",
+  "https://bsc-testnet.therpc.io",
+  "https://bnb-testnet.api.onfinality.io/public",
+  "https://endpoints.omniatech.io/v1/bsc/testnet/public",
+  "https://api.zan.top/bsc-testnet",
+  "https://public.stackup.sh/api/v1/node/bsc-testnet",
+  "https://bsctestapi.terminet.io/rpc",
+  "https://rpc.sentio.xyz/bsc-testnet",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 10
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Alpen Testnet (chainId: 8150) ───
+[[chains]]
+name = "alpen_testnet"
+route = "/alpen_testnet"
+chain_id = 8150
+rotation = "latency"
+endpoints = [
+  "https://rpc.testnet.alpenlabs.io",
+  "https://rpc.pectra-testnet.alpenlabs.io",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 3
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
+
+# ─── Solana Devnet ───
+[[chains]]
+name = "solana_testnet"
+route = "/solana_testnet"
+rotation = "latency"
+endpoints = [
+  "https://api.devnet.solana.com",
+  "https://api.testnet.solana.com",
+  "https://rpc.ankr.com/solana_devnet",
+  "https://solana-devnet.drpc.org",
+  "https://solana-devnet.api.onfinality.io/public",
+  "https://solana-devnet.gateway.tatum.io",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_method = "getSlot"
+health_check_interval_seconds = 300
+max_block_lag = 50
+max_retries = 5
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+preset = "solana"
+max_capacity = 50000
+
+# ─── Starknet Sepolia ───
+[[chains]]
+name = "starknet_sepolia"
+route = "/starknet_sepolia"
+rotation = "latency"
+endpoints = [
+  "https://starknet-sepolia-rpc.publicnode.com",
+  "https://starknet-sepolia.public.blastapi.io",
+  "https://starknet-sepolia.drpc.org",
+  "https://free-rpc.nethermind.io/sepolia-juno/v0_7",
+  "https://starknet-sepolia.reddio.com/rpc/v0_7",
+  "https://rpc.starknet-testnet.lava.build",
+  "https://endpoints.omniatech.io/v1/starknet/sepolia/public",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_method = "starknet_blockNumber"
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 5
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 3
+
+[chains.cache]
+enabled = true
+max_capacity = 50000
+
+# ─── HyperEVM Testnet (chainId: 998) ───
+[[chains]]
+name = "hyperevm_testnet"
+route = "/hyperevm_testnet"
+chain_id = 998
+rotation = "latency"
+endpoints = [
+  "https://rpc.hyperliquid-testnet.xyz/evm",
+  "https://998.rpc.thirdweb.com",
+]
+
+[chains.health]
+max_consecutive_failures = 2
+cooldown_seconds = 60
+health_check_interval_seconds = 300
+max_block_lag = 10
+max_retries = 3
+retry_delay_ms = 0
+
+[chains.rate_limit]
+max_requests = 100
+window_seconds = 1
+
+[chains.hedge]
+delay_ms = 100
+max_count = 1
+
+[chains.cache]
+enabled = true
+preset = "evm"
+max_capacity = 50000
