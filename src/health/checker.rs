@@ -1,6 +1,5 @@
 use super::ChainPool;
 use crate::config::{default_health_method, EndpointAuth};
-use futures_util::future::join_all;
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,8 +29,8 @@ pub fn spawn_health_checker(
     tokio::spawn(async move {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
-            .pool_max_idle_per_host(2)
-            .pool_idle_timeout(Duration::from_secs(15))
+            .pool_max_idle_per_host(0)
+            .pool_idle_timeout(Duration::from_secs(1))
             .build()
             .expect("Failed to build health check client");
 
@@ -108,6 +107,47 @@ pub fn spawn_health_checker(
                     }
                 }
             }
+
+            // --- Demotion evaluation ---
+            const THROTTLE_DEMOTION_THRESHOLD: u64 = 3;
+            let mut to_demote: Vec<usize> = Vec::new();
+
+            for (idx, result) in &results {
+                let should_demote = match result {
+                    HealthCheckResult::Ok(h)
+                        if max_height > 0 && max_height - h > max_block_lag =>
+                    {
+                        true // Already marked stale above, also demote
+                    }
+                    HealthCheckResult::Failed => {
+                        // Check if consecutive failures hit threshold
+                        pool.health[*idx]
+                            .consecutive_failures
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                            >= pool.health_config.max_consecutive_failures
+                    }
+                    HealthCheckResult::Throttled => {
+                        // Check chronic throttling
+                        pool.health[*idx]
+                            .throttle_count
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                            >= THROTTLE_DEMOTION_THRESHOLD
+                    }
+                    _ => false,
+                };
+                if should_demote {
+                    to_demote.push(*idx);
+                }
+            }
+
+            for idx in to_demote {
+                warn!(
+                    chain = %chain_name,
+                    endpoint = %pool.endpoints[idx].url,
+                    "Demoting endpoint to rpc_house"
+                );
+                pool.demote_and_replace(idx);
+            }
         }
     });
 }
@@ -117,35 +157,24 @@ async fn fetch_block_heights(
     pool: &ChainPool,
     method: &str,
 ) -> Vec<(usize, HealthCheckResult)> {
-    let futures: Vec<_> = pool
-        .endpoints
-        .iter()
-        .enumerate()
-        .map(|(idx, endpoint)| {
-            let client = client.clone();
-            let method = method.to_string();
-            let url = endpoint.url.clone();
-            let auth = endpoint.auth.clone();
-            async move {
-                let start = std::time::Instant::now();
-                let result = fetch_block_height(&client, &url, &method, auth.as_ref()).await;
-                let latency_ms = start.elapsed().as_millis() as u64;
-                (idx, result, latency_ms)
-            }
-        })
-        .collect();
+    let active_guard = pool.active_indices.load();
+    let active: &[usize] = &active_guard;
+    let mut results = Vec::with_capacity(active.len());
 
-    let results = join_all(futures).await;
+    for &idx in active {
+        let endpoint = &pool.endpoints[idx];
+        let start = std::time::Instant::now();
+        let result =
+            fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
+        let latency_ms = start.elapsed().as_millis() as u64;
+
+        if let HealthCheckResult::Ok(_) = &result {
+            pool.update_latency(idx, latency_ms);
+        }
+        results.push((idx, result));
+    }
 
     results
-        .into_iter()
-        .map(|(idx, result, latency_ms)| {
-            if let HealthCheckResult::Ok(_) = &result {
-                pool.update_latency(idx, latency_ms);
-            }
-            (idx, result)
-        })
-        .collect()
 }
 
 async fn fetch_block_height(

@@ -238,14 +238,7 @@ async fn health_handler(State(state): State<Arc<AppState>>) -> Json<HealthRespon
                 None => chain_state.pool.name.clone(),
             };
             let healthy = chain_state.pool.healthy_count();
-            let total = chain_state.pool.endpoints.len();
-            let state_str = if healthy == total {
-                "OK"
-            } else if healthy > 0 {
-                "DEGRADED"
-            } else {
-                "DOWN"
-            };
+            let state_str = if healthy >= 1 { "OK" } else { "DOWN" };
             ChainHealthEntry {
                 id,
                 alias: chain_state.pool.name.clone(),
