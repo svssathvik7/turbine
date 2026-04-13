@@ -320,9 +320,8 @@ function latencyColor(ms) {
 }
 
 function chainHealth(c) {
-  if (c.active_endpoints === c.total_endpoints) return 'healthy';
-  if (c.active_endpoints === 0) return 'down';
-  return 'degraded';
+  if (c.active_endpoints >= 1) return 'healthy';
+  return 'down';
 }
 
 function shortLabel(url) {
