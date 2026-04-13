@@ -438,9 +438,12 @@ function render(data) {
       const epSuccessRate = ep.request_count > 0
         ? pct(ep.success_count, ep.request_count) + '%'
         : '--';
+      const isReserve = ep.roster_status === 'reserve';
+      const rowStyle = isReserve ? ' style="opacity:0.4"' : '';
+      const badge = isReserve ? ' <span style="color:var(--text-dim);font-size:0.75em">[RESERVE]</span>' : '';
 
-      endpointsHtml += `<tr>
-        <td><div class="url-cell"><span class="status-dot ${dot}"></span><span class="url-chip" onclick="copyUrl(this, '${ep.url.replace(/'/g, "\\'")}')" title="${ep.url}">${shortLabel(ep.url)}<span class="copy-tooltip">Copied!</span></span></div></td>
+      endpointsHtml += `<tr${rowStyle}>
+        <td><div class="url-cell"><span class="status-dot ${dot}"></span><span class="url-chip" onclick="copyUrl(this, '${ep.url.replace(/'/g, "\\'")}')" title="${ep.url}">${shortLabel(ep.url)}<span class="copy-tooltip">Copied!</span></span>${badge}</div></td>
         <td class="${lClass}">${latency}</td>
         <td>${block}</td>
         <td style="text-align:center">${ep.weight}</td>
