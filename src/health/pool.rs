@@ -1,4 +1,5 @@
 use super::state::EndpointStatus;
+use super::state::RosterStatus;
 use super::EndpointHealth;
 use crate::config::{ChainConfig, EndpointConfig, HealthConfig, HedgeConfig, RotationStrategy};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -486,6 +487,7 @@ impl ChainPool {
                     success_count: snap.success_count,
                     failure_count: snap.failure_count,
                     throttle_count: snap.throttle_count,
+                    roster_status: RosterStatus::Active,
                 }
             })
             .collect()

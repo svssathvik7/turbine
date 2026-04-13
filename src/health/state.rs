@@ -3,6 +3,13 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RosterStatus {
+    Active,
+    Reserve,
+}
+
 #[derive(Debug)]
 pub struct EndpointHealth {
     pub consecutive_failures: AtomicU32,
@@ -61,6 +68,7 @@ pub struct EndpointStatus {
     pub success_count: u64,
     pub failure_count: u64,
     pub throttle_count: u64,
+    pub roster_status: RosterStatus,
 }
 
 /// Initial throttle backoff: 1 second.
@@ -286,4 +294,17 @@ pub struct EndpointHealthSnapshot {
     pub success_count: u64,
     pub failure_count: u64,
     pub throttle_count: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn roster_status_serializes_to_lowercase() {
+        let active = serde_json::to_string(&RosterStatus::Active).unwrap();
+        let reserve = serde_json::to_string(&RosterStatus::Reserve).unwrap();
+        assert_eq!(active, "\"active\"");
+        assert_eq!(reserve, "\"reserve\"");
+    }
 }
