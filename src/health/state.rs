@@ -288,10 +288,10 @@ impl EndpointHealth {
         let self_nanos = self.last_failure_nanos.load(Ordering::Relaxed);
         let other_nanos = other.last_failure_nanos.load(Ordering::Relaxed);
         match (self_nanos, other_nanos) {
-            (0, 0) => false,     // neither failed
-            (0, _) => true,      // self never failed — wins
-            (_, 0) => false,     // other never failed — other wins
-            (a, b) => a < b,     // earlier timestamp wins
+            (0, 0) => false, // neither failed
+            (0, _) => true,  // self never failed — wins
+            (_, 0) => false, // other never failed — other wins
+            (a, b) => a < b, // earlier timestamp wins
         }
     }
 

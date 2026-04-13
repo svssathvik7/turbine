@@ -114,17 +114,23 @@ pub fn spawn_health_checker(
 
             for (idx, result) in &results {
                 let should_demote = match result {
-                    HealthCheckResult::Ok(h) if max_height > 0 && max_height - h > max_block_lag => {
+                    HealthCheckResult::Ok(h)
+                        if max_height > 0 && max_height - h > max_block_lag =>
+                    {
                         true // Already marked stale above, also demote
                     }
                     HealthCheckResult::Failed => {
                         // Check if consecutive failures hit threshold
-                        pool.health[*idx].consecutive_failures.load(std::sync::atomic::Ordering::Relaxed)
+                        pool.health[*idx]
+                            .consecutive_failures
+                            .load(std::sync::atomic::Ordering::Relaxed)
                             >= pool.health_config.max_consecutive_failures
                     }
                     HealthCheckResult::Throttled => {
                         // Check chronic throttling
-                        pool.health[*idx].throttle_count.load(std::sync::atomic::Ordering::Relaxed)
+                        pool.health[*idx]
+                            .throttle_count
+                            .load(std::sync::atomic::Ordering::Relaxed)
                             >= THROTTLE_DEMOTION_THRESHOLD
                     }
                     _ => false,
@@ -158,7 +164,8 @@ async fn fetch_block_heights(
     for &idx in active {
         let endpoint = &pool.endpoints[idx];
         let start = std::time::Instant::now();
-        let result = fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
+        let result =
+            fetch_block_height(client, &endpoint.url, method, endpoint.auth.as_ref()).await;
         let latency_ms = start.elapsed().as_millis() as u64;
 
         if let HealthCheckResult::Ok(_) = &result {

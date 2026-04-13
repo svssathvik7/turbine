@@ -288,7 +288,10 @@ impl ChainPool {
 
     pub fn healthy_count(&self) -> usize {
         let active = self.active_indices.load();
-        active.iter().filter(|&&i| self.health[i].is_available()).count()
+        active
+            .iter()
+            .filter(|&&i| self.health[i].is_available())
+            .count()
     }
 
     pub fn total_weight(&self) -> u32 {
