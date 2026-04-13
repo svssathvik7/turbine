@@ -34,3 +34,4 @@ governor = "0.8"
 tokio-tungstenite = { version = "0.28", features = ["native-tls"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "alloc"] }
 base64 = "0.22"
+rand = "0.8"
