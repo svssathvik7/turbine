@@ -63,196 +63,35 @@ impl ChainPool {
 
     /// Select the next healthy endpoint based on rotation strategy.
     pub fn next_endpoint(&self) -> Option<(usize, &str)> {
+        let active = self.active_indices.read().unwrap();
         match self.rotation {
-            RotationStrategy::RoundRobin => self.next_round_robin(),
-            RotationStrategy::Weighted => self.next_weighted(),
-            RotationStrategy::Latency => {
-                let all: Vec<usize> = (0..self.endpoints.len()).collect();
-                self.next_latency_based(&all, &[])
+            RotationStrategy::RoundRobin | RotationStrategy::Weighted => {
+                self.next_endpoint_from_eligible(&active, &[])
             }
+            RotationStrategy::Latency => self.next_latency_based(&active, &[]),
         }
     }
 
     /// Select the next healthy endpoint excluding a specific index.
     pub fn next_endpoint_excluding(&self, exclude: usize) -> Option<(usize, &str)> {
+        let active = self.active_indices.read().unwrap();
         match self.rotation {
-            RotationStrategy::RoundRobin => self.next_round_robin_excluding(exclude),
-            RotationStrategy::Weighted => self.next_weighted_excluding(exclude),
-            RotationStrategy::Latency => {
-                let all: Vec<usize> = (0..self.endpoints.len()).collect();
-                self.next_latency_based(&all, &[exclude])
+            RotationStrategy::RoundRobin | RotationStrategy::Weighted => {
+                self.next_endpoint_from_eligible(&active, &[exclude])
             }
+            RotationStrategy::Latency => self.next_latency_based(&active, &[exclude]),
         }
     }
 
     /// Select the next healthy endpoint excluding multiple indices.
     pub fn next_endpoint_excluding_many(&self, exclude: &[usize]) -> Option<(usize, &str)> {
+        let active = self.active_indices.read().unwrap();
         match self.rotation {
-            RotationStrategy::RoundRobin => {
-                let len = self.endpoints.len();
-                let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-                for i in 0..len {
-                    let idx = (start + i) % len;
-                    if exclude.contains(&idx) {
-                        continue;
-                    }
-                    if self.health[idx].is_available() {
-                        return Some((idx, &self.endpoints[idx].url));
-                    }
-                }
-                // Fallback: least recently failed excluding all
-                let mut best: Option<usize> = None;
-                for i in 0..len {
-                    if exclude.contains(&i) {
-                        continue;
-                    }
-                    match best {
-                        None => best = Some(i),
-                        Some(prev) => {
-                            if self.health[i].failed_earlier_than(&self.health[prev]) {
-                                best = Some(i);
-                            }
-                        }
-                    }
-                }
-                best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
+            RotationStrategy::RoundRobin | RotationStrategy::Weighted => {
+                self.next_endpoint_from_eligible(&active, exclude)
             }
-            RotationStrategy::Weighted => {
-                let healthy_weight: u32 = self
-                    .endpoints
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, _)| !exclude.contains(i) && self.health[*i].is_healthy())
-                    .map(|(_, e)| e.weight)
-                    .sum();
-                if healthy_weight == 0 {
-                    let mut best: Option<usize> = None;
-                    for i in 0..self.endpoints.len() {
-                        if exclude.contains(&i) {
-                            continue;
-                        }
-                        match best {
-                            None => best = Some(i),
-                            Some(prev) => {
-                                if self.health[i].failed_earlier_than(&self.health[prev]) {
-                                    best = Some(i);
-                                }
-                            }
-                        }
-                    }
-                    return best.map(|idx| (idx, self.endpoints[idx].url.as_str()));
-                }
-                let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
-                let target = tick % healthy_weight;
-                let mut cumulative = 0u32;
-                for (i, ep) in self.endpoints.iter().enumerate() {
-                    if exclude.contains(&i) || !self.health[i].is_healthy() {
-                        continue;
-                    }
-                    cumulative += ep.weight;
-                    if target < cumulative {
-                        return Some((i, &ep.url));
-                    }
-                }
-                None
-            }
-            RotationStrategy::Latency => {
-                let all: Vec<usize> = (0..self.endpoints.len()).collect();
-                self.next_latency_based(&all, exclude)
-            }
+            RotationStrategy::Latency => self.next_latency_based(&active, exclude),
         }
-    }
-
-    fn next_round_robin(&self) -> Option<(usize, &str)> {
-        let len = self.endpoints.len();
-        let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-
-        for i in 0..len {
-            let idx = (start + i) % len;
-            if self.health[idx].is_available() {
-                return Some((idx, &self.endpoints[idx].url));
-            }
-        }
-
-        self.least_recently_failed(None)
-    }
-
-    fn next_round_robin_excluding(&self, exclude: usize) -> Option<(usize, &str)> {
-        let len = self.endpoints.len();
-        let start = self.counter.fetch_add(1, Ordering::Relaxed) % len;
-
-        for i in 0..len {
-            let idx = (start + i) % len;
-            if idx == exclude {
-                continue;
-            }
-            if self.health[idx].is_available() {
-                return Some((idx, &self.endpoints[idx].url));
-            }
-        }
-
-        self.least_recently_failed(Some(exclude))
-    }
-
-    fn next_weighted(&self) -> Option<(usize, &str)> {
-        // Calculate total healthy weight
-        let healthy_weight: u32 = self
-            .endpoints
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| self.health[*i].is_healthy())
-            .map(|(_, e)| e.weight)
-            .sum();
-
-        if healthy_weight == 0 {
-            return self.least_recently_failed(None);
-        }
-
-        let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
-        let target = tick % healthy_weight;
-        let mut cumulative = 0u32;
-
-        for (i, ep) in self.endpoints.iter().enumerate() {
-            if !self.health[i].is_healthy() {
-                continue;
-            }
-            cumulative += ep.weight;
-            if target < cumulative {
-                return Some((i, &ep.url));
-            }
-        }
-
-        self.least_recently_failed(None)
-    }
-
-    fn next_weighted_excluding(&self, exclude: usize) -> Option<(usize, &str)> {
-        let healthy_weight: u32 = self
-            .endpoints
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| *i != exclude && self.health[*i].is_healthy())
-            .map(|(_, e)| e.weight)
-            .sum();
-
-        if healthy_weight == 0 {
-            return self.least_recently_failed(Some(exclude));
-        }
-
-        let tick = self.counter.fetch_add(1, Ordering::Relaxed) as u32;
-        let target = tick % healthy_weight;
-        let mut cumulative = 0u32;
-
-        for (i, ep) in self.endpoints.iter().enumerate() {
-            if i == exclude || !self.health[i].is_healthy() {
-                continue;
-            }
-            cumulative += ep.weight;
-            if target < cumulative {
-                return Some((i, &ep.url));
-            }
-        }
-
-        self.least_recently_failed(Some(exclude))
     }
 
     /// Latency-based selection: effective_weight = user_weight × (1.0 / rolling_latency_ms).
@@ -306,38 +145,24 @@ impl ChainPool {
             .map(|&(idx, _)| (idx, self.endpoints[idx].url.as_str()))
     }
 
-    fn least_recently_failed(&self, exclude: Option<usize>) -> Option<(usize, &str)> {
-        let mut best: Option<usize> = None;
-        for i in 0..self.endpoints.len() {
-            if Some(i) == exclude {
-                continue;
-            }
-            match best {
-                None => best = Some(i),
-                Some(prev) => {
-                    if self.health[i].failed_earlier_than(&self.health[prev]) {
-                        best = Some(i);
-                    }
-                }
-            }
-        }
-        best.map(|idx| (idx, self.endpoints[idx].url.as_str()))
-    }
-
     /// Compute which endpoint indices are eligible to serve a given method.
     ///
     /// - If any endpoint declares `methods` containing `method`, return only those indices.
     /// - Otherwise, return indices of endpoints with no `methods` restriction (unconstrained).
     pub fn eligible_indices_for_method(&self, method: &str) -> Vec<usize> {
+        let active = self.active_indices.read().unwrap();
+
         let claimed: Vec<usize> = self
             .endpoints
             .iter()
             .enumerate()
-            .filter(|(_, ep)| {
-                ep.methods
-                    .as_ref()
-                    .map(|m| m.iter().any(|s| s == method))
-                    .unwrap_or(false)
+            .filter(|(i, ep)| {
+                active.contains(i)
+                    && ep
+                        .methods
+                        .as_ref()
+                        .map(|m| m.iter().any(|s| s == method))
+                        .unwrap_or(false)
             })
             .map(|(i, _)| i)
             .collect();
@@ -350,7 +175,7 @@ impl ChainPool {
         self.endpoints
             .iter()
             .enumerate()
-            .filter(|(_, ep)| ep.methods.is_none())
+            .filter(|(i, ep)| active.contains(i) && ep.methods.is_none())
             .map(|(i, _)| i)
             .collect()
     }
@@ -460,7 +285,8 @@ impl ChainPool {
     }
 
     pub fn healthy_count(&self) -> usize {
-        self.health.iter().filter(|h| h.is_available()).count()
+        let active = self.active_indices.read().unwrap();
+        active.iter().filter(|&&i| self.health[i].is_available()).count()
     }
 
     pub fn total_weight(&self) -> u32 {
@@ -489,11 +315,17 @@ impl ChainPool {
     }
 
     pub fn endpoint_statuses(&self) -> Vec<EndpointStatus> {
+        let active = self.active_indices.read().unwrap();
         self.endpoints
             .iter()
             .enumerate()
             .map(|(i, ep)| {
                 let snap = self.health[i].snapshot();
+                let roster_status = if active.contains(&i) {
+                    RosterStatus::Active
+                } else {
+                    RosterStatus::Reserve
+                };
                 EndpointStatus {
                     url: redact_url(&ep.url),
                     weight: ep.weight,
@@ -507,7 +339,7 @@ impl ChainPool {
                     success_count: snap.success_count,
                     failure_count: snap.failure_count,
                     throttle_count: snap.throttle_count,
-                    roster_status: RosterStatus::Active,
+                    roster_status,
                 }
             })
             .collect()
@@ -739,5 +571,96 @@ mod tests {
         all.extend(house.iter());
         all.sort();
         assert_eq!(all, vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn next_endpoint_only_returns_active_indices() {
+        let config = make_config(vec![
+            ep("https://a.com", None),
+            ep("https://b.com", None),
+            ep("https://c.com", None),
+            ep("https://d.com", None),
+            ep("https://e.com", None),
+            ep("https://f.com", None),
+            ep("https://g.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let active = pool.active_indices.read().unwrap().clone();
+
+        for _ in 0..50 {
+            let (idx, _) = pool.next_endpoint().unwrap();
+            assert!(
+                active.contains(&idx),
+                "Selected index {} is not in active set {:?}",
+                idx,
+                active
+            );
+        }
+    }
+
+    #[test]
+    fn eligible_indices_intersects_with_active_set() {
+        let config = make_config(vec![
+            ep("https://a.com", None),
+            ep("https://b.com", None),
+            ep("https://c.com", None),
+            ep("https://d.com", None),
+            ep("https://e.com", None),
+            ep("https://f.com", None),
+            ep("https://g.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let active = pool.active_indices.read().unwrap().clone();
+        let eligible = pool.eligible_indices_for_method("eth_call");
+
+        for idx in &eligible {
+            assert!(
+                active.contains(idx),
+                "Eligible index {} is not in active set {:?}",
+                idx,
+                active
+            );
+        }
+        assert_eq!(eligible.len(), active.len());
+    }
+
+    #[test]
+    fn healthy_count_only_counts_active_endpoints() {
+        let config = make_config(vec![
+            ep("https://a.com", None),
+            ep("https://b.com", None),
+            ep("https://c.com", None),
+            ep("https://d.com", None),
+            ep("https://e.com", None),
+            ep("https://f.com", None),
+            ep("https://g.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        assert_eq!(pool.healthy_count(), 5);
+    }
+
+    #[test]
+    fn endpoint_statuses_tags_roster_status_correctly() {
+        let config = make_config(vec![
+            ep("https://a.com", None),
+            ep("https://b.com", None),
+            ep("https://c.com", None),
+            ep("https://d.com", None),
+            ep("https://e.com", None),
+            ep("https://f.com", None),
+            ep("https://g.com", None),
+        ]);
+        let pool = ChainPool::new(&config);
+        let statuses = pool.endpoint_statuses();
+        let active_count = statuses
+            .iter()
+            .filter(|s| matches!(s.roster_status, RosterStatus::Active))
+            .count();
+        let reserve_count = statuses
+            .iter()
+            .filter(|s| matches!(s.roster_status, RosterStatus::Reserve))
+            .count();
+        assert_eq!(active_count, 5);
+        assert_eq!(reserve_count, 2);
     }
 }
