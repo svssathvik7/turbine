@@ -7,7 +7,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct ChainPool {
@@ -25,7 +25,7 @@ pub struct ChainPool {
     /// Uses ArcSwap for lock-free reads on the hot path (every request).
     pub active_indices: ArcSwap<Vec<usize>>,
     /// Reserve queue — FIFO. Front = next promotion candidate.
-    pub rpc_house: Mutex<VecDeque<usize>>,
+    pub rpc_house: ArcSwap<VecDeque<usize>>,
 }
 
 const ACTIVE_SET_SIZE: usize = 5;
@@ -59,7 +59,7 @@ impl ChainPool {
             hedge_config: config.hedge.clone(),
             total_weight,
             active_indices: ArcSwap::from_pointee(active_indices),
-            rpc_house: Mutex::new(rpc_house),
+            rpc_house: ArcSwap::from_pointee(rpc_house),
         }
     }
 
@@ -312,11 +312,12 @@ impl ChainPool {
     /// If rpc_house is empty (after pushing the demoted endpoint), recycles
     /// all non-active indices back into the queue.
     pub fn demote_and_replace(&self, idx: usize) {
-        let mut house = self.rpc_house.lock().unwrap();
-
-        // Load current active set
+        // Load current state
         let current_active = self.active_indices.load();
+        let current_house = self.rpc_house.load();
+
         let mut new_active: Vec<usize> = current_active.iter().copied().collect();
+        let mut new_house: VecDeque<usize> = current_house.as_ref().clone();
 
         // Remove from active set
         if let Some(pos) = new_active.iter().position(|&i| i == idx) {
@@ -326,26 +327,27 @@ impl ChainPool {
         }
 
         // Push demoted to back of rpc_house
-        house.push_back(idx);
+        new_house.push_back(idx);
 
         // If rpc_house only contains the just-demoted endpoint, recycle
-        if house.len() == 1 {
+        if new_house.len() == 1 {
             let mut recyclable: Vec<usize> = (0..self.endpoints.len())
                 .filter(|i| !new_active.contains(i) && *i != idx)
                 .collect();
             recyclable.shuffle(&mut thread_rng());
             for r in recyclable {
-                house.push_back(r);
+                new_house.push_back(r);
             }
         }
 
         // Pop front as replacement (guaranteed != idx since idx is at back)
-        if let Some(replacement) = house.pop_front() {
+        if let Some(replacement) = new_house.pop_front() {
             new_active.push(replacement);
         }
 
-        // Atomically swap in the new active set
+        // Atomically swap both
         self.active_indices.store(Arc::new(new_active));
+        self.rpc_house.store(Arc::new(new_house));
     }
 
     pub fn rotation_name(&self) -> &str {
@@ -586,7 +588,7 @@ mod tests {
         ]);
         let pool = ChainPool::new(&config);
         let active = pool.active_indices.load();
-        let house = pool.rpc_house.lock().unwrap();
+        let house = pool.rpc_house.load();
         assert_eq!(active.len(), 3);
         assert!(house.is_empty());
     }
@@ -605,7 +607,7 @@ mod tests {
         ]);
         let pool = ChainPool::new(&config);
         let active = pool.active_indices.load();
-        let house = pool.rpc_house.lock().unwrap();
+        let house = pool.rpc_house.load();
         assert_eq!(active.len(), 5);
         assert_eq!(house.len(), 3);
         // All indices accounted for
@@ -701,7 +703,7 @@ mod tests {
         let active_after = pool.active_indices.load().clone();
         assert_eq!(active_after.len(), 5);
         assert!(!active_after.contains(&demoted_idx));
-        let house = pool.rpc_house.lock().unwrap();
+        let house = pool.rpc_house.load();
         assert!(house.contains(&demoted_idx));
     }
 
