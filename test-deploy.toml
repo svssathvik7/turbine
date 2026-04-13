@@ -297,8 +297,6 @@ route = "/solana_testnet"
 rotation = "latency"
 endpoints = [
   "https://api.devnet.solana.com",
-  "https://api.testnet.solana.com",
-  "https://rpc.ankr.com/solana_devnet",
   "https://solana-devnet.drpc.org",
   "https://solana-devnet.api.onfinality.io/public",
   "https://solana-devnet.gateway.tatum.io",
