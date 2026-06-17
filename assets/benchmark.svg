@@ -1,0 +1,126 @@
+<svg viewBox="0 0 820 240" width="820" height="240" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#060b12"/>
+      <stop offset="100%" stop-color="#0a1220"/>
+    </linearGradient>
+    <linearGradient id="barOld" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#92400e"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="barNew" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#065f46"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <style>
+      text { font-family: 'Courier New', Courier, monospace; }
+      /* Bars grow from left → right */
+      @keyframes growW {
+        from { transform: scaleX(0); }
+        to   { transform: scaleX(1); }
+      }
+      .old-bar {
+        transform-box: fill-box;
+        transform-origin: 0% 50%;
+        animation: growW 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s both;
+      }
+      .new-bar {
+        transform-box: fill-box;
+        transform-origin: 0% 50%;
+        animation: growW 1.4s cubic-bezier(0.22,1,0.36,1) 0.6s both;
+      }
+      @keyframes fadein { from { opacity:0; } to { opacity:1; } }
+      .lbl { animation: fadein 0.6s ease-out 1.6s both; }
+      .imp { animation: fadein 0.8s ease-out 1.2s both; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="820" height="240" fill="url(#bg)" rx="10"/>
+
+  <!-- Title -->
+  <text x="410" y="28" text-anchor="middle" font-size="11" fill="#4b5563" letter-spacing="3">
+    BENCHMARK — 50 CONCURRENT CLIENTS  ·  v0.10.0 vs v1.0.0
+  </text>
+
+  <!-- Legend -->
+  <rect x="280" y="38" width="12" height="12" fill="#b45309" rx="2"/>
+  <text x="296" y="49" font-size="10" fill="#6b7280">v0.10.0</text>
+  <rect x="370" y="38" width="12" height="12" fill="#059669" rx="2"/>
+  <text x="386" y="49" font-size="10" fill="#6b7280">v1.0.0</text>
+
+  <!-- ── LEFT CHART: Throughput ─────────────────────────── -->
+  <!-- chart area: x=160 to x=390, rows at y=88 and y=120 -->
+  <text x="158" y="93"  text-anchor="end" font-size="10" fill="#6b7280">THROUGHPUT</text>
+  <text x="158" y="105" text-anchor="end" font-size="9"  fill="#374151">(req / s)</text>
+
+  <!-- Baseline -->
+  <line x1="160" y1="135" x2="395" y2="135" stroke="#1f2937" stroke-width="1"/>
+
+  <!-- OLD: 9.6/130 × 230 = 17px -->
+  <rect class="old-bar" x="160" y="81"  width="17"  height="18" fill="url(#barOld)" rx="3"/>
+  <!-- NEW: 123/130 × 230 = 217.5px -->
+  <rect class="new-bar" x="160" y="103" width="218" height="18" fill="url(#barNew)" rx="3"/>
+
+  <!-- Value labels -->
+  <text class="lbl" x="181"  y="95"  font-size="10" fill="#d97706">9.6</text>
+  <text class="lbl" x="382" y="117"  font-size="10" fill="#10b981">123+</text>
+
+  <!-- Row labels -->
+  <text x="156" y="94"  text-anchor="end" font-size="9" fill="#374151">OLD</text>
+  <text x="156" y="116" text-anchor="end" font-size="9" fill="#374151">NEW</text>
+
+  <!-- Improvement callout -->
+  <text class="imp" x="395" y="100" font-size="22" font-weight="900" fill="#f0f6fc" text-anchor="end">12.9×</text>
+  <text class="imp" x="395" y="115" font-size="10" fill="#6b7280" text-anchor="end">faster</text>
+
+  <!-- ── RIGHT CHART: p99 Latency ───────────────────────── -->
+  <text x="578" y="93"  text-anchor="end" font-size="10" fill="#6b7280">BURST p99</text>
+  <text x="578" y="105" text-anchor="end" font-size="9"  fill="#374151">(seconds)</text>
+
+  <!-- Baseline -->
+  <line x1="580" y1="135" x2="815" y2="135" stroke="#1f2937" stroke-width="1"/>
+
+  <!-- OLD: 19.9/20 × 230 = 228.9px (nearly full) -->
+  <rect class="old-bar" x="580" y="81"  width="229" height="18" fill="url(#barOld)" rx="3"/>
+  <!-- NEW: 0.57/20 × 230 = 6.6px -->
+  <rect class="new-bar" x="580" y="103" width="7"   height="18" fill="url(#barNew)" rx="3"/>
+
+  <!-- Value labels -->
+  <text class="lbl" x="813" y="95"  font-size="10" fill="#d97706" text-anchor="end">19.9 s</text>
+  <text class="lbl" x="593" y="117" font-size="10" fill="#10b981">0.57 s</text>
+
+  <!-- Row labels -->
+  <text x="576" y="94"  text-anchor="end" font-size="9" fill="#374151">OLD</text>
+  <text x="576" y="116" text-anchor="end" font-size="9" fill="#374151">NEW</text>
+
+  <!-- Improvement callout -->
+  <text class="imp" x="815" y="100" font-size="22" font-weight="900" fill="#f0f6fc" text-anchor="end">35×</text>
+  <text class="imp" x="815" y="115" font-size="10" fill="#6b7280" text-anchor="end">lower p99</text>
+
+  <!-- Vertical divider between charts -->
+  <line x1="445" y1="55" x2="445" y2="145" stroke="#1f2937" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <!-- Footer note -->
+  <text x="410" y="175" text-anchor="middle" font-size="9" fill="#374151">
+    Ethereum Sepolia  ·  Lock-free health tracking  ·  FuturesUnordered hedging
+  </text>
+
+  <!-- Heavy burst row (smaller, below) -->
+  <text x="140" y="205" text-anchor="end" font-size="9" fill="#374151">HEAVY BURST</text>
+  <text x="140" y="216" text-anchor="end" font-size="9" fill="#374151">(100 concurrent)</text>
+
+  <!-- throughput heavy: 197→245 -->
+  <rect class="old-bar" x="145" y="198" width="185" height="10" fill="#78350f" rx="2" opacity="0.8"/>
+  <rect class="new-bar" x="145" y="210" width="230" height="10" fill="#064e3b" rx="2" opacity="0.8"/>
+  <text class="lbl" x="334" y="207" font-size="9" fill="#92400e">197</text>
+  <text class="lbl" x="379" y="219" font-size="9" fill="#047857">245</text>
+
+  <!-- p99 heavy: 1.49→0.78 -->
+  <rect class="old-bar" x="465" y="198" width="172" height="10" fill="#78350f" rx="2" opacity="0.8"/>
+  <rect class="new-bar" x="465" y="210" width="90"  height="10" fill="#064e3b" rx="2" opacity="0.8"/>
+  <text class="lbl" x="641" y="207" font-size="9" fill="#92400e">1.49 s</text>
+  <text class="lbl" x="559" y="219" font-size="9" fill="#047857">0.78 s</text>
+
+  <text x="410" y="235" text-anchor="middle" font-size="9" fill="#1f2937">──── 100-concurrent results above show throughput gain; p99 was already acceptable ────</text>
+</svg>

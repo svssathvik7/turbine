@@ -1,0 +1,91 @@
+<svg viewBox="0 0 900 160" width="900" height="160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#060b12"/>
+      <stop offset="100%" stop-color="#0e1726"/>
+    </linearGradient>
+    <linearGradient id="tg" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="45%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#38bdf8" stop-opacity="0"/>
+      <stop offset="50%"  stop-color="#38bdf8" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow" x="-10%" y="-40%" width="120%" height="180%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="b"/>
+      <feFlood flood-color="#38bdf8" flood-opacity="0.55" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <style>
+      @keyframes sweep {
+        0%   { transform: translateX(-320px); }
+        100% { transform: translateX(1220px); }
+      }
+      @keyframes fadein {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes blink {
+        0%, 100% { opacity: 0.5; }
+        50%      { opacity: 1; }
+      }
+      .sw1 { animation: sweep 5s linear infinite; }
+      .sw2 { animation: sweep 5s linear 1.7s infinite; }
+      .sw3 { animation: sweep 5s linear 3.4s infinite; }
+      .title { animation: fadein 1s ease-out both; }
+      .sub   { animation: fadein 1s ease-out 0.5s both; }
+      .dot   { animation: blink 2s ease-in-out infinite; }
+      .dot2  { animation: blink 2s ease-in-out 0.7s infinite; }
+      .dot3  { animation: blink 2s ease-in-out 1.4s infinite; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="160" fill="url(#bg)" rx="10"/>
+
+  <!-- Subtle grid -->
+  <line x1="0" y1="53"  x2="900" y2="53"  stroke="#ffffff" stroke-width="0.4" opacity="0.04"/>
+  <line x1="0" y1="107" x2="900" y2="107" stroke="#ffffff" stroke-width="0.4" opacity="0.04"/>
+  <line x1="300" y1="0" x2="300" y2="160" stroke="#ffffff" stroke-width="0.4" opacity="0.04"/>
+  <line x1="600" y1="0" x2="600" y2="160" stroke="#ffffff" stroke-width="0.4" opacity="0.04"/>
+
+  <!-- Animated light sweeps -->
+  <rect class="sw1" x="0" y="0" width="320" height="160" fill="url(#sweep)"/>
+  <rect class="sw2" x="0" y="0" width="220" height="160" fill="url(#sweep)" opacity="0.6"/>
+  <rect class="sw3" x="0" y="0" width="160" height="160" fill="url(#sweep)" opacity="0.4"/>
+
+  <!-- Corner bracket accents (top-left) -->
+  <rect x="12" y="12" width="32" height="2.5" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <rect x="12" y="12" width="2.5" height="32" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <!-- top-right -->
+  <rect x="856" y="12" width="32" height="2.5" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <rect x="885.5" y="12" width="2.5" height="32" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <!-- bottom-left -->
+  <rect x="12" y="145.5" width="32" height="2.5" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <rect x="12" y="116" width="2.5" height="32" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <!-- bottom-right -->
+  <rect x="856" y="145.5" width="32" height="2.5" fill="#38bdf8" opacity="0.7" rx="1"/>
+  <rect x="885.5" y="116" width="2.5" height="32" fill="#38bdf8" opacity="0.7" rx="1"/>
+
+  <!-- Blinking dots (decorative) -->
+  <circle class="dot"  cx="52"  cy="80" r="3" fill="#38bdf8"/>
+  <circle class="dot2" cx="848" cy="80" r="3" fill="#a78bfa"/>
+  <circle class="dot3" cx="450" cy="18" r="2" fill="#38bdf8"/>
+
+  <!-- Main title -->
+  <text class="title" x="450" y="97" text-anchor="middle"
+    font-family="'Courier New', Courier, monospace"
+    font-size="70" font-weight="900"
+    fill="url(#tg)" filter="url(#glow)" letter-spacing="10">TURBINE</text>
+
+  <!-- Subtitle -->
+  <text class="sub" x="450" y="132" text-anchor="middle"
+    font-family="'Courier New', Courier, monospace"
+    font-size="12" fill="#4b5563" letter-spacing="5">
+    MULTI-CHAIN  ·  JSON-RPC PROXY  ·  WRITTEN IN RUST
+  </text>
+</svg>

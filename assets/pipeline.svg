@@ -1,0 +1,195 @@
+<svg viewBox="0 0 900 250" width="900" height="250" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#060b12"/>
+      <stop offset="100%" stop-color="#0a1220"/>
+    </linearGradient>
+    <!-- box fill gradients for each stage color -->
+    <linearGradient id="gAuth"  x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1030"/><stop offset="100%" stop-color="#130820"/></linearGradient>
+    <linearGradient id="gRoute" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#0d1e30"/><stop offset="100%" stop-color="#081422"/></linearGradient>
+    <linearGradient id="gLimit" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1800"/><stop offset="100%" stop-color="#120f00"/></linearGradient>
+    <linearGradient id="gCache" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#061a0e"/><stop offset="100%" stop-color="#04120a"/></linearGradient>
+    <linearGradient id="gPool"  x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a0b2e"/><stop offset="100%" stop-color="#110720"/></linearGradient>
+    <linearGradient id="gFwd"   x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#001a2e"/><stop offset="100%" stop-color="#00111e"/></linearGradient>
+
+    <filter id="boxGlow" x="-20%" y="-30%" width="140%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="b"/>
+      <feFlood flood-color="#38bdf8" flood-opacity="0.6" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="pktGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#374151"/>
+    </marker>
+    <marker id="arrE" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L6,3 z" fill="#1d4a22"/>
+    </marker>
+
+    <style>
+      /* Wave: each box activates (glows) as packet passes through */
+      /* period=4s, packet speed=225px/s, box centers at x=75,225,375,525,675,825 */
+      /* peak(n) = xn/900*4s → delays calculated so peak aligns at kf 40% */
+      @keyframes wave {
+        0%, 15%, 85%, 100% { opacity: 1; }
+        40% { filter: url(#boxGlow); }
+        0%, 100% { filter: none; }
+      }
+      @keyframes waveStroke {
+        0%, 15%, 85%, 100% { stroke: #1f2937; stroke-width: 1.5; }
+        40% { stroke: #38bdf8; stroke-width: 2; }
+      }
+      @keyframes waveFill {
+        0%, 15%, 85%, 100% { fill: #0d1520; }
+        40% { fill: #0d2035; }
+      }
+      /* box n delay = (xCenter/900)*4 - 0.4*4 = xCenter/225 - 1.6 */
+      /* s1 peak at 0.333s → delay = 0.333-1.6 = -1.267s */
+      /* s2 peak at 1.0s   → delay = 1.0-1.6   = -0.6s   */
+      /* s3 peak at 1.667s → delay = 1.667-1.6  = 0.067s  */
+      /* s4 peak at 2.333s → delay = 2.333-1.6  = 0.733s  */
+      /* s5 peak at 3.0s   → delay = 3.0-1.6    = 1.4s    */
+      /* s6 peak at 3.667s → delay = 3.667-1.6  = 2.067s  */
+      .b1s { animation: waveStroke 4s linear -1.267s infinite; }
+      .b2s { animation: waveStroke 4s linear -0.6s   infinite; }
+      .b3s { animation: waveStroke 4s linear  0.067s  infinite; }
+      .b4s { animation: waveStroke 4s linear  0.733s  infinite; }
+      .b5s { animation: waveStroke 4s linear  1.4s    infinite; }
+      .b6s { animation: waveStroke 4s linear  2.067s  infinite; }
+      .b1f { animation: waveFill 4s linear -1.267s infinite; }
+      .b2f { animation: waveFill 4s linear -0.6s   infinite; }
+      .b3f { animation: waveFill 4s linear  0.067s  infinite; }
+      .b4f { animation: waveFill 4s linear  0.733s  infinite; }
+      .b5f { animation: waveFill 4s linear  1.4s    infinite; }
+      .b6f { animation: waveFill 4s linear  2.067s  infinite; }
+      /* Packet dot traveling left→right */
+      @keyframes travel {
+        0%   { transform: translateX(0px);   opacity: 0; }
+        4%   { opacity: 1; }
+        96%  { opacity: 1; }
+        100% { transform: translateX(900px); opacity: 0; }
+      }
+      .pkt { animation: travel 4s linear infinite; }
+      /* Endpoint pulse */
+      @keyframes epulse {
+        0%, 100% { opacity: 0.7; r: 9; }
+        50%      { opacity: 1;   r: 11; }
+      }
+      .ea { animation: epulse 2s ease-in-out 0s   infinite; }
+      .eb { animation: epulse 2s ease-in-out 0.6s infinite; }
+      .ec { animation: epulse 2s ease-in-out 1.2s infinite; }
+      .ed { animation: epulse 2s ease-in-out 1.8s infinite; }
+      /* fade-in for static labels */
+      @keyframes fadein { from { opacity:0; } to { opacity:1; } }
+      .lbl { animation: fadein 1.2s ease-out both; }
+      text { font-family: 'Courier New', Courier, monospace; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="250" fill="url(#bg)" rx="10"/>
+
+  <!-- Flow line (the "track" the packet rides) -->
+  <line x1="0" y1="118" x2="900" y2="118" stroke="#1f2937" stroke-width="1.5" stroke-dasharray="4 4"/>
+
+  <!-- ── BOXES ────────────────────────────────────────────── -->
+  <!-- Box layout: centers at x=75,225,375,525,675,825; width=110; y=95 to y=141 -->
+
+  <!-- Box 1: AUTH -->
+  <rect class="b1f" x="20"  y="95" width="110" height="46" rx="6" fill="#0d1520"/>
+  <rect class="b1s" x="20"  y="95" width="110" height="46" rx="6" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="75"  y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#a78bfa">AUTH</text>
+  <text x="75"  y="132" text-anchor="middle" font-size="9"  fill="#4b5563">api key</text>
+
+  <!-- Box 2: ROUTE -->
+  <rect class="b2f" x="170" y="95" width="110" height="46" rx="6" fill="#0d1520"/>
+  <rect class="b2s" x="170" y="95" width="110" height="46" rx="6" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="225" y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#38bdf8">ROUTE</text>
+  <text x="225" y="132" text-anchor="middle" font-size="9"  fill="#4b5563">chain id</text>
+
+  <!-- Box 3: LIMIT -->
+  <rect class="b3f" x="320" y="95" width="110" height="46" rx="6" fill="#0d1520"/>
+  <rect class="b3s" x="320" y="95" width="110" height="46" rx="6" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="375" y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#fbbf24">LIMIT</text>
+  <text x="375" y="132" text-anchor="middle" font-size="9"  fill="#4b5563">rate gate</text>
+
+  <!-- Box 4: CACHE -->
+  <rect class="b4f" x="470" y="95" width="110" height="46" rx="6" fill="#0d1520"/>
+  <rect class="b4s" x="470" y="95" width="110" height="46" rx="6" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="525" y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#34d399">CACHE</text>
+  <text x="525" y="132" text-anchor="middle" font-size="9"  fill="#4b5563">ttl store</text>
+
+  <!-- Box 5: POOL -->
+  <rect class="b5f" x="620" y="95" width="110" height="46" rx="6" fill="#0d1520"/>
+  <rect class="b5s" x="620" y="95" width="110" height="46" rx="6" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="675" y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#c084fc">POOL</text>
+  <text x="675" y="132" text-anchor="middle" font-size="9"  fill="#4b5563">endpoints</text>
+
+  <!-- Box 6: HEDGE -->
+  <rect class="b6f" x="770" y="95" width="110" height="46" rx="6" fill="#0d1520"/>
+  <rect class="b6s" x="770" y="95" width="110" height="46" rx="6" fill="none" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="825" y="117" text-anchor="middle" font-size="13" font-weight="700" fill="#60a5fa">HEDGE</text>
+  <text x="825" y="132" text-anchor="middle" font-size="9"  fill="#4b5563">forward</text>
+
+  <!-- ── ARROWS between boxes ──────────────────────────────── -->
+  <line x1="132" y1="118" x2="166" y2="118" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="282" y1="118" x2="316" y2="118" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="432" y1="118" x2="466" y2="118" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="582" y1="118" x2="616" y2="118" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="732" y1="118" x2="766" y2="118" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── REJECTION EXITS ───────────────────────────────────── -->
+  <!-- 401 from AUTH -->
+  <line x1="75" y1="95" x2="75" y2="68" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
+  <text x="75" y="62" text-anchor="middle" font-size="9" fill="#a78bfa" opacity="0.8">401</text>
+
+  <!-- 404 from ROUTE -->
+  <line x1="225" y1="95" x2="225" y2="68" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
+  <text x="225" y="62" text-anchor="middle" font-size="9" fill="#38bdf8" opacity="0.8">404</text>
+
+  <!-- 429 from LIMIT -->
+  <line x1="375" y1="95" x2="375" y2="68" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
+  <text x="375" y="62" text-anchor="middle" font-size="9" fill="#fbbf24" opacity="0.8">429</text>
+
+  <!-- HIT from CACHE -->
+  <line x1="525" y1="95" x2="525" y2="68" stroke="#34d399" stroke-width="1" stroke-dasharray="3 2" opacity="0.6"/>
+  <text x="525" y="62" text-anchor="middle" font-size="9" fill="#34d399" opacity="0.8">HIT ↩</text>
+
+  <!-- ── ENDPOINT NODES below POOL ─────────────────────────── -->
+  <!-- Lines from box 5 bottom (675, 141) to 4 endpoints at y=210 -->
+  <line x1="675" y1="141" x2="625" y2="198" stroke="#1f2937" stroke-width="1"/>
+  <line x1="675" y1="141" x2="655" y2="198" stroke="#1f2937" stroke-width="1"/>
+  <line x1="675" y1="141" x2="695" y2="198" stroke="#1f2937" stroke-width="1"/>
+  <line x1="675" y1="141" x2="725" y2="198" stroke="#1f2937" stroke-width="1"/>
+
+  <!-- Endpoint circles (A, B healthy green; C red/unhealthy; D healthy green) -->
+  <circle class="ea" cx="625" cy="210" r="10" fill="#052010" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="625" cy="210" y="214" text-anchor="middle" font-size="9" font-weight="700" fill="#22c55e">A</text>
+
+  <circle class="eb" cx="655" cy="210" r="10" fill="#052010" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="655" y="214" text-anchor="middle" font-size="9" font-weight="700" fill="#22c55e">B</text>
+
+  <!-- C: unhealthy -->
+  <circle cx="695" cy="210" r="10" fill="#200505" stroke="#ef4444" stroke-width="1.5" opacity="0.6"/>
+  <text x="695" y="214" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444" opacity="0.7">C</text>
+  <line x1="688" y1="203" x2="702" y2="217" stroke="#ef4444" stroke-width="1.5" opacity="0.7"/>
+
+  <circle class="ec" cx="725" cy="210" r="10" fill="#052010" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="725" y="214" text-anchor="middle" font-size="9" font-weight="700" fill="#22c55e">D</text>
+
+  <!-- "endpoint pool" label -->
+  <text x="675" y="238" text-anchor="middle" font-size="9" fill="#374151">healthy / unhealthy auto-detected</text>
+
+  <!-- ── TRAVELING PACKET ───────────────────────────────────── -->
+  <circle class="pkt" cx="0" cy="118" r="6" fill="#38bdf8" filter="url(#pktGlow)" opacity="0.95"/>
+
+  <!-- ── EDGE LABELS ───────────────────────────────────────── -->
+  <text class="lbl" x="12"  y="112" text-anchor="middle" font-size="9" fill="#374151">CLIENT</text>
+  <text class="lbl" x="888" y="112" text-anchor="middle" font-size="9" fill="#374151">UPSTREAM</text>
+
+  <!-- Title -->
+  <text x="450" y="22" text-anchor="middle" font-size="11" fill="#374151" letter-spacing="3">REQUEST PIPELINE</text>
+</svg>
